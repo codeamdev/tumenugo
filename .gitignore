@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# Variables de entorno
+# .env          → NO ignorado: contiene solo valores públicos seguros (se commitea)
+# .env.local    → ignorado: secretos del desarrollador local
+# .env.production → ignorado: secretos del servidor
+.env.local
+.env.*.local
+.env.production
+
+# Secrets con credenciales de producción
+ecosystem.config.js
+CREDENCIALES.md
+
+# Logs
+*.log
+npm-debug.log*
+
+# Build output
+dist/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Drizzle generated (keep migrations, not meta snapshot)
+drizzle/**/meta/_journal.json
+
+# IDE
+.vscode/
+.idea/
+
+# Claude Code
+.claude/
+
+# Docker
+nginx/ssl/

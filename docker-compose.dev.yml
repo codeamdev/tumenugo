@@ -1,0 +1,36 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# docker-compose.dev.yml — Solo PostgreSQL para desarrollo local
+#
+# NO incluye la app Next.js ni Nginx — esos los corre npm run dev.
+# Usa un volumen separado (pgdata_dev) para no interferir con producción.
+#
+# Uso:
+#   docker compose -f docker-compose.dev.yml up -d      # iniciar
+#   docker compose -f docker-compose.dev.yml down       # detener
+#   docker compose -f docker-compose.dev.yml logs       # ver logs
+#
+# O con el script:
+#   npm run dev:db
+# ══════════════════════════════════════════════════════════════════════════════
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: cafeteria
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"    # Expuesto al host para que next dev pueda conectarse directamente
+    volumes:
+      - pgdata_dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d cafeteria"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  pgdata_dev:
+    driver: local       # Volumen separado — no toca pgdata de producción
