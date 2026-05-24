@@ -192,6 +192,7 @@ export function PedidosScreen({
   const [payingOrder, setPayingOrder] = useState<DBOrder | null>(null)
   const [payLines, setPayLines] = useState<{ method: string; amount: string }[]>([])
   const [payNotes, setPayNotes] = useState('')
+  const [payCustomerName, setPayCustomerName] = useState('')
   const [paying, setPaying] = useState(false)
 
   // ── Custom product state
@@ -458,6 +459,7 @@ export function PedidosScreen({
     const total = String(parseFloat(order.total ?? '0'))
     setPayLines([{ method: paymentMethods[0]?.key ?? 'cash', amount: total }])
     setPayNotes('')
+    setPayCustomerName(order.customerName ?? '')
     setShowPayModal(true)
   }
 
@@ -469,6 +471,9 @@ export function PedidosScreen({
         .filter((l) => l.amount && parseFloat(l.amount) > 0)
         .map((l) => ({ method: l.method, amount: parseFloat(l.amount) }))
 
+      const firstMethod = validPayments[0]?.method
+      const isCredit = !!(firstMethod && paymentMethods.find((m) => m.key === firstMethod)?.isCredit)
+
       const res = await fetch(`/api/tenant/orders/${payingOrder.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -476,6 +481,7 @@ export function PedidosScreen({
           action: 'close',
           payments: validPayments,
           paymentNotes: payNotes || undefined,
+          customerName: isCredit ? payCustomerName.trim() : undefined,
         }),
       })
       if (!res.ok) throw new Error()
@@ -560,6 +566,7 @@ export function PedidosScreen({
   const totalReceived = payLinesValid.reduce((s, l) => s + parseFloat(l.amount), 0)
   const payChange = Math.max(0, totalReceived - payTotal)
   const payRemaining = Math.max(0, payTotal - totalReceived)
+  const isPayCredit = !!(payLines[0] && paymentMethods.find((m) => m.key === payLines[0].method)?.isCredit)
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Header (shared across all views)
@@ -1690,13 +1697,30 @@ export function PedidosScreen({
             )}
           </div>
 
+          {/* Nombre del cliente — obligatorio para crédito */}
+          {isPayCredit && (
+            <div className="space-y-1.5">
+              <Label>Nombre del cliente <span className="text-destructive">*</span></Label>
+              <Input
+                value={payCustomerName}
+                onChange={(e) => setPayCustomerName(e.target.value)}
+                placeholder="Nombre completo de quien debe"
+              />
+            </div>
+          )}
+
           {/* Notes */}
           <div className="space-y-1.5">
-            <Label>Observaciones (opcional)</Label>
+            <Label>
+              Observaciones
+              {isPayCredit
+                ? <span className="text-destructive"> *</span>
+                : <span className="text-muted-foreground text-xs"> (opcional)</span>}
+            </Label>
             <Input
               value={payNotes}
               onChange={(e) => setPayNotes(e.target.value)}
-              placeholder="Referencia de transferencia, etc."
+              placeholder={isPayCredit ? 'Motivo, plazo de pago, referencia...' : 'Referencia de transferencia, etc.'}
             />
           </div>
 
@@ -1706,10 +1730,16 @@ export function PedidosScreen({
             </Button>
             <Button
               onClick={confirmPay}
-              disabled={paying || payLinesValid.length === 0 || payRemaining > 0 || payChange > 0}
+              disabled={
+                paying ||
+                payLinesValid.length === 0 ||
+                payRemaining > 0 ||
+                payChange > 0 ||
+                (isPayCredit && (!payCustomerName.trim() || !payNotes.trim()))
+              }
               className="flex-1"
             >
-              {paying ? 'Procesando...' : 'Confirmar cobro'}
+              {paying ? 'Procesando...' : isPayCredit ? 'Registrar deuda' : 'Confirmar cobro'}
             </Button>
           </div>
         </DialogContent>
