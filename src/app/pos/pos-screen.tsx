@@ -58,9 +58,10 @@ interface Props {
   currencySign: string
   deliveryFields?: DeliveryFields
   paymentMethods: PaymentMethodConfig[]
+  defaultDeliveryFee?: number
 }
 
-export function POSScreen({ categories, products, tables, userId, tenantName, currencySign, deliveryFields, paymentMethods }: Props) {
+export function POSScreen({ categories, products, tables, userId, tenantName, currencySign, deliveryFields, paymentMethods, defaultDeliveryFee = 0 }: Props) {
   const { toast } = useToast()
   const store = usePOSStore()
 
@@ -550,6 +551,7 @@ export function POSScreen({ categories, products, tables, userId, tenantName, cu
           tables={tables}
           onClose={() => setShowNewOrderModal(false)}
           deliveryFields={deliveryFields}
+          defaultDeliveryFee={defaultDeliveryFee}
           defaultTab="delivery"
           onCreate={(origin) => {
             store.newOrder(origin)

@@ -23,10 +23,11 @@ interface Props {
   onClose: () => void
   onCreate: (origin: OrderOrigin) => void
   deliveryFields?: DeliveryFields
+  defaultDeliveryFee?: number
   defaultTab?: 'table' | 'bar' | 'delivery'
 }
 
-export function NewOrderModal({ tables, onClose, onCreate, deliveryFields, defaultTab = 'table' }: Props) {
+export function NewOrderModal({ tables, onClose, onCreate, deliveryFields, defaultDeliveryFee = 0, defaultTab = 'table' }: Props) {
   const df = deliveryFields ?? { phone: true, address: true, notes: true, fee: true }
   const [tab, setTab] = useState<'table' | 'bar' | 'delivery'>(defaultTab)
   const [selectedTable, setSelectedTable] = useState<{ id: string; name: string } | null>(null)
@@ -35,7 +36,7 @@ export function NewOrderModal({ tables, onClose, onCreate, deliveryFields, defau
     customerPhone: '',
     customerAddress: '',
     customerNotes: '',
-    deliveryFee: 0,
+    deliveryFee: defaultDeliveryFee,
   })
 
   function handleCreate() {

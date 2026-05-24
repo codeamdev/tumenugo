@@ -30,6 +30,7 @@ export interface PosConfig {
   }
   paymentMethods?: { key: string; label: string; isCredit?: boolean }[]
   defaultOpeningAmount?: number
+  defaultDeliveryFee?: number
 }
 
 export const tenants = pgTable('tenants', {

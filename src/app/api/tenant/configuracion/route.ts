@@ -27,6 +27,7 @@ const updateSchema = z.object({
     deliveryFields: deliveryFieldsSchema,
     paymentMethods: z.array(z.object({ key: z.string().min(1), label: z.string().min(1), isCredit: z.boolean().optional() })).optional(),
     defaultOpeningAmount: z.number().min(0).optional(),
+    defaultDeliveryFee: z.number().min(0).optional(),
   }).optional(),
 })
 

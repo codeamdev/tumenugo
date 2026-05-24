@@ -69,11 +69,23 @@ export const usePOSStore = create<POSState>()(
 
       addItem: (orderId, item) =>
         set((s) => ({
-          orders: s.orders.map((o) =>
-            o.localId === orderId
-              ? { ...o, items: [...o.items, { ...item, id: crypto.randomUUID() }] }
-              : o
-          ),
+          orders: s.orders.map((o) => {
+            if (o.localId !== orderId) return o
+            // Merge if same product and no modifiers on either side
+            const noMods = item.modifiers.length === 0
+            const existing = noMods
+              ? o.items.find((i) => i.productId === item.productId && i.modifiers.length === 0)
+              : null
+            if (existing) {
+              return {
+                ...o,
+                items: o.items.map((i) =>
+                  i.id === existing.id ? { ...i, quantity: i.quantity + item.quantity } : i
+                ),
+              }
+            }
+            return { ...o, items: [...o.items, { ...item, id: crypto.randomUUID() }] }
+          }),
         })),
 
       removeItem: (orderId, itemId) =>

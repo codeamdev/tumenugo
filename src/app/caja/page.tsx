@@ -94,6 +94,7 @@ export default async function CajaPage() {
       history={history.map((h) => serializeReg(h)!)}
       currencySign={tenant.currencySign ?? '$'}
       paymentMethodLabels={methodLabels}
+      defaultOpeningAmount={tenant.posConfig?.defaultOpeningAmount ?? 0}
     />
   )
 }

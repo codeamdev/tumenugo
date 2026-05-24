@@ -89,6 +89,7 @@ export default function ConfiguracionPage() {
     deliveryFee: true,
     paymentMethods: DEFAULT_PAYMENT_METHODS,
     defaultOpeningAmount: 0,
+    defaultDeliveryFee: 0,
   })
 
   useEffect(() => {
@@ -111,6 +112,7 @@ export default function ConfiguracionPage() {
           deliveryFee: d.posConfig?.deliveryFields?.fee ?? true,
           paymentMethods: normalizePaymentMethods(d.posConfig?.paymentMethods),
           defaultOpeningAmount: d.posConfig?.defaultOpeningAmount ?? 0,
+          defaultDeliveryFee: d.posConfig?.defaultDeliveryFee ?? 0,
         })
         setLoading(false)
       })
@@ -141,6 +143,7 @@ export default function ConfiguracionPage() {
             },
             paymentMethods: form.paymentMethods,
             defaultOpeningAmount: form.defaultOpeningAmount,
+            defaultDeliveryFee: form.defaultDeliveryFee,
           },
         }),
       })
@@ -317,6 +320,20 @@ export default function ConfiguracionPage() {
               {label}
             </button>
           ))}
+        </div>
+        <div className="space-y-2 max-w-xs pt-2">
+          <Label>Valor domicilio por defecto ({form.currencySign || '$'})</Label>
+          <Input
+            type="number"
+            min="0"
+            step="500"
+            value={form.defaultDeliveryFee}
+            onChange={(e) => setForm((f) => ({ ...f, defaultDeliveryFee: Number(e.target.value) }))}
+            placeholder="0"
+          />
+          <p className="text-xs text-muted-foreground">
+            Se pre-carga automáticamente al crear un pedido a domicilio.
+          </p>
         </div>
       </Card>
 

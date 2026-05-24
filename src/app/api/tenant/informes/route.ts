@@ -8,11 +8,22 @@ import { and, eq, gte, lte, inArray, sql } from 'drizzle-orm'
 import { buildMethodLabels } from '@/lib/payment-methods'
 import type { PosConfig } from '@/lib/db/schema/public'
 
-function startOfDay(d: Date) {
-  const r = new Date(d); r.setHours(0, 0, 0, 0); return r
+function localDateStr(): string {
+  const now = new Date()
+  const y = now.getFullYear()
+  const m = String(now.getMonth() + 1).padStart(2, '0')
+  const d = String(now.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
 }
-function endOfDay(d: Date) {
-  const r = new Date(d); r.setHours(23, 59, 59, 999); return r
+
+function startOfDay(dateStr: string): Date {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  return new Date(y, m - 1, d, 0, 0, 0, 0)
+}
+
+function endOfDay(dateStr: string): Date {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  return new Date(y, m - 1, d, 23, 59, 59, 999)
 }
 
 export async function GET(req: NextRequest) {
@@ -20,12 +31,10 @@ export async function GET(req: NextRequest) {
   const tenant = await requireActiveTenant()
 
   const { searchParams } = new URL(req.url)
-  const from = searchParams.get('from')
-    ? new Date(searchParams.get('from')!)
-    : startOfDay(new Date())
-  const to = searchParams.get('to')
-    ? endOfDay(new Date(searchParams.get('to')!))
-    : endOfDay(new Date())
+  const fromStr = searchParams.get('from') ?? localDateStr()
+  const toStr   = searchParams.get('to')   ?? localDateStr()
+  const from = startOfDay(fromStr)
+  const to   = endOfDay(toStr)
 
   const data = await withTenant(tenant.schemaName, async (db) => {
     // Pedidos cerrados y cobrados en el período

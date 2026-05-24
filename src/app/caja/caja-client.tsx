@@ -42,13 +42,14 @@ interface Props {
   history: CashRegister[]
   currencySign: string
   paymentMethodLabels: Record<string, string>
+  defaultOpeningAmount?: number
 }
 
-export function CajaClient({ register, summary, history, currencySign, paymentMethodLabels }: Props) {
+export function CajaClient({ register, summary, history, currencySign, paymentMethodLabels, defaultOpeningAmount = 0 }: Props) {
   const router = useRouter()
   const { toast } = useToast()
 
-  const [openingAmount, setOpeningAmount] = useState('')
+  const [openingAmount, setOpeningAmount] = useState(defaultOpeningAmount > 0 ? String(defaultOpeningAmount) : '')
   const [openNotes, setOpenNotes] = useState('')
   const [countedCash, setCountedCash] = useState('')
   const [closeNotes, setCloseNotes] = useState('')

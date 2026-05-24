@@ -144,7 +144,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
           const defaultAmount = tenant.posConfig?.defaultOpeningAmount ?? 0
           ;[openRegister] = await db
             .insert(cashRegisters)
-            .values({ openedBy: session.sub, openingAmount: String(defaultAmount), status: 'open' })
+            .values({
+              openedBy: session.sub,
+              openingAmount: String(defaultAmount),
+              status: 'open',
+              openedAt: updated.closedAt ?? new Date(),
+            })
             .returning()
         }
 
