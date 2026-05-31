@@ -25,6 +25,17 @@ ARG NEXT_PUBLIC_BASE_DOMAIN
 ARG NEXT_PUBLIC_APP_URL
 ENV NEXT_PUBLIC_BASE_DOMAIN=$NEXT_PUBLIC_BASE_DOMAIN
 ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
+
+# Dummy vars para satisfacer getters de env.ts durante next build.
+# Next.js evalúa módulos de rutas API al compilar — estos valores nunca
+# se usan para conectar a nada, el valor real viene de .env.production en runtime.
+ARG DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
+ARG JWT_SECRET="buildsecret"
+ARG JWT_REFRESH_SECRET="buildrefreshsecret"
+ENV DATABASE_URL=$DATABASE_URL
+ENV JWT_SECRET=$JWT_SECRET
+ENV JWT_REFRESH_SECRET=$JWT_REFRESH_SECRET
+
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
