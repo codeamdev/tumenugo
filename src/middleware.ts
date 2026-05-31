@@ -122,7 +122,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // ── Root domain → redirect to superadmin ─────────────────────────────────
-  if (!pathname.startsWith('/superadmin') && !pathname.startsWith('/_next')) {
+  if (!pathname.startsWith('/superadmin') && !pathname.startsWith('/_next') && !pathname.startsWith('/api/')) {
     const url = request.nextUrl.clone()
     url.pathname = '/superadmin'
     return NextResponse.redirect(url)
