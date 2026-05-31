@@ -1,0 +1,61 @@
+# docker-compose.phase1.yml — Fase 1: IP pública, sin dominio
+#
+# Usa el nginx y PostgreSQL del sistema host (no levanta contenedores propios).
+# Evita conflictos con las otras aplicaciones del servidor.
+#
+# Uso:
+#   docker compose -f docker-compose.phase1.yml --env-file .env.production build
+#   docker compose -f docker-compose.phase1.yml --env-file .env.production run --rm migrate --profile migrate
+#   docker compose -f docker-compose.phase1.yml --env-file .env.production up -d
+
+services:
+
+  # ── Next.js App ─────────────────────────────────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+      args:
+        NEXT_PUBLIC_BASE_DOMAIN: ${NEXT_PUBLIC_BASE_DOMAIN}
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
+    image: cafeteria-app:latest
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
+    ports:
+      - "3001:3000"   # Puerto 3001 en el host → evita conflictos con otras apps
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # Accede al postgres del sistema host
+    healthcheck:
+      test:
+        - "CMD"
+        - "node"
+        - "-e"
+        - "require('http').get('http://localhost:3000/api/auth/me',(r)=>r.statusCode<500?process.exit(0):process.exit(1)).on('error',()=>process.exit(1))"
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # ── Migrations (one-shot) ────────────────────────────────────────────────────
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: migrator
+    image: cafeteria-migrator:latest
+    command: sh -c "npm run db:migrate:public && npm run db:migrate:tenants"
+    env_file: .env.production
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    profiles:
+      - migrate

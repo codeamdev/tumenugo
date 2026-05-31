@@ -1,6 +1,7 @@
 import {
   pgTable,
   uuid,
+  integer,
   text,
   jsonb,
   timestamp,
@@ -88,6 +89,12 @@ export const userTenantMap = pgTable(
     emailIdx: index('idx_user_tenant_map_email').on(t.email),
   }),
 )
+
+export const systemConfig = pgTable('system_config', {
+  id: integer('id').primaryKey().default(1),
+  defaultTenantSlug: text('default_tenant_slug').notNull().default(''),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+})
 
 export type Tenant = typeof tenants.$inferSelect
 export type TenantInsert = typeof tenants.$inferInsert

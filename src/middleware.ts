@@ -2,6 +2,26 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN ?? 'localhost'
 
+// Module-level cache para el tenant por defecto (TTL 60s).
+// Se sincroniza desde /api/internal/default-tenant; cae en cascada al env var.
+let _cachedDefaultSlug: string | null = null
+let _cacheExpiry = 0
+
+async function resolveDefaultTenantSlug(origin: string): Promise<string> {
+  if (Date.now() < _cacheExpiry && _cachedDefaultSlug !== null) return _cachedDefaultSlug
+  try {
+    const res = await fetch(`${origin}/api/internal/default-tenant`, { cache: 'no-store' })
+    if (res.ok) {
+      const json = await res.json() as { slug: string }
+      _cachedDefaultSlug = json.slug ?? ''
+      _cacheExpiry = Date.now() + 60_000
+    }
+  } catch {
+    // Mantener valor cacheado o caer en env var
+  }
+  return _cachedDefaultSlug ?? (process.env.DEFAULT_TENANT_SLUG ?? '')
+}
+
 function extractSubdomain(hostname: string): string | null {
   // Strip port
   const host = hostname.split(':')[0]
@@ -33,7 +53,7 @@ const CORS_HEADERS = {
   'Access-Control-Max-Age': '86400',
 }
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   // Respond to CORS preflight before any redirect logic
   if (request.method === 'OPTIONS') {
     return new NextResponse(null, { status: 204, headers: CORS_HEADERS })
@@ -41,6 +61,12 @@ export function middleware(request: NextRequest) {
 
   const host = request.headers.get('host') ?? ''
   const { pathname } = request.nextUrl
+
+  // Evitar interceptar la API interna que el propio middleware consulta
+  if (pathname.startsWith('/api/internal/')) {
+    return NextResponse.next()
+  }
+
   const subdomain = extractSubdomain(host)
 
   // ── Superadmin subdomain ──────────────────────────────────────────────────
@@ -78,6 +104,21 @@ export function middleware(request: NextRequest) {
   const clientSlug = request.headers.get('x-tenant-slug')
   if (clientSlug) {
     return NextResponse.next()
+  }
+
+  // ── Default tenant fallback (Fase 1: acceso por IP sin subdominio) ──────────
+  const defaultSlug = await resolveDefaultTenantSlug(request.nextUrl.origin)
+  if (defaultSlug) {
+    const requestHeaders = new Headers(request.headers)
+    requestHeaders.set('x-tenant-slug', defaultSlug)
+
+    if (pathname === '/') {
+      const url = request.nextUrl.clone()
+      url.pathname = '/dashboard'
+      return NextResponse.redirect(url)
+    }
+
+    return NextResponse.next({ request: { headers: requestHeaders } })
   }
 
   // ── Root domain → redirect to superadmin ─────────────────────────────────
