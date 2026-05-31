@@ -5,7 +5,7 @@ import { publicDb } from '@/lib/db/public-db'
 import { superadminUsers, superadminRefreshTokens } from '@/lib/db/schema/public'
 import { verifyPassword } from '@/lib/auth/password'
 import { signAccessToken, signRefreshToken, REFRESH_TTL_MS } from '@/lib/auth/jwt'
-import { setAuthCookies } from '@/lib/auth/cookies'
+import { setAuthCookiesOnResponse } from '@/lib/auth/cookies'
 import { createHash, randomBytes } from 'crypto'
 
 const schema = z.object({
@@ -48,11 +48,11 @@ export async function POST(request: NextRequest) {
       expiresAt: new Date(Date.now() + REFRESH_TTL_MS),
     })
 
-    setAuthCookies(accessToken, refreshToken, 'superadmin')
-
-    return NextResponse.json({
+    const response = NextResponse.json({
       user: { id: user.id, name: user.name, email: user.email },
     })
+    setAuthCookiesOnResponse(response, accessToken, refreshToken, 'superadmin')
+    return response
   } catch (err) {
     if (err instanceof z.ZodError) {
       return NextResponse.json({ error: 'Datos inválidos' }, { status: 400 })

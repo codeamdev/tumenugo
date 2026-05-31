@@ -7,7 +7,7 @@ import { publicDb } from '@/lib/db/public-db'
 import { tenants, userTenantMap } from '@/lib/db/schema/public'
 import { verifyPassword } from '@/lib/auth/password'
 import { signAccessToken, signRefreshToken, REFRESH_TTL_MS } from '@/lib/auth/jwt'
-import { setAuthCookies } from '@/lib/auth/cookies'
+import { setAuthCookiesOnResponse } from '@/lib/auth/cookies'
 import { resolveTenantBySlug } from '@/lib/tenant'
 import { getPaymentMethods, DEFAULT_PAYMENT_METHODS } from '@/lib/payment-methods'
 import type { PosConfig } from '@/lib/db/schema/public'
@@ -169,8 +169,7 @@ export async function POST(request: NextRequest) {
       refreshToken,
     })
 
-    setAuthCookies(accessToken, refreshToken, 'tenant')
-
+    setAuthCookiesOnResponse(response, accessToken, refreshToken, 'tenant')
     return response
   } catch (err) {
     if (err instanceof z.ZodError) {
