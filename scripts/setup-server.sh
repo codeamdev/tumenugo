@@ -86,44 +86,78 @@ cd "$APP_DIR"
 step "Paso 4/10 — PostgreSQL"
 # ══════════════════════════════════════════════════════════════════════════════
 
-info "Nota: la app se conectará a postgres desde Docker via host.docker.internal."
-info "Asegúrate de que pg_hba.conf permita conexiones desde 172.17.0.0/16 (red Docker)."
-echo ""
+# En Linux, PostgreSQL acepta conexiones locales por Unix socket (peer auth),
+# no por TCP por defecto. Usamos sudo -u postgres para las operaciones locales
+# y configuramos TCP para que Docker pueda conectar.
 
-ask "Contraseña del usuario 'postgres'"
-read -rs DB_PASSWORD
-echo ""
+# ── 4a. Verificar que PostgreSQL está corriendo ───────────────────────────────
+sudo -u postgres psql -c '\q' 2>/dev/null \
+  || die "No se puede conectar a PostgreSQL vía Unix socket. ¿Está corriendo? Verifica: sudo systemctl status postgresql"
+ok "PostgreSQL accesible (Unix socket)"
 
-export PGPASSWORD="$DB_PASSWORD"
+# ── 4b. Detectar versión y rutas de configuración ────────────────────────────
+PG_VERSION=$(sudo -u postgres psql -tAc "SHOW server_version_num;" 2>/dev/null | cut -c1-2 || echo "")
+PG_CONF_DIR=$(sudo -u postgres psql -tAc "SHOW config_file;" 2>/dev/null | xargs dirname || echo "")
+PG_CONF="$PG_CONF_DIR/postgresql.conf"
+PG_HBA="$PG_CONF_DIR/pg_hba.conf"
+info "Configuración en: $PG_CONF_DIR"
 
-# Verificar conexión
-psql -U "$DB_USER" -h 127.0.0.1 -c '\q' 2>/dev/null \
-  || die "No se pudo conectar a PostgreSQL. Verifica la contraseña y que PostgreSQL escuche en 127.0.0.1."
-ok "Conexión a PostgreSQL OK"
-
-# Crear base de datos si no existe
-if psql -U "$DB_USER" -h 127.0.0.1 -lqt 2>/dev/null | cut -d'|' -f1 | grep -qw "$DB_NAME"; then
+# ── 4c. Crear base de datos si no existe ─────────────────────────────────────
+if sudo -u postgres psql -lqt 2>/dev/null | cut -d'|' -f1 | grep -qw "$DB_NAME"; then
   warn "Base de datos '$DB_NAME' ya existe — se omite la creación"
 else
-  psql -U "$DB_USER" -h 127.0.0.1 -c "CREATE DATABASE $DB_NAME;" 2>/dev/null
+  sudo -u postgres psql -c "CREATE DATABASE $DB_NAME;" 2>/dev/null
   ok "Base de datos '$DB_NAME' creada"
 fi
 
-unset PGPASSWORD
+# ── 4d. Contraseña del usuario postgres (necesaria para Docker vía TCP) ───────
+echo ""
+info "El contenedor Docker se conecta a PostgreSQL por TCP."
+info "Se necesita una contraseña para el usuario 'postgres'."
+echo ""
+ask "Contraseña para usuario 'postgres' (nueva o existente)"
+read -rs DB_PASSWORD
+echo ""
+ask "Confirmar contraseña"
+read -rs DB_PASSWORD2
+echo ""
 
-# Advertencia sobre pg_hba.conf si Docker no puede conectar
-info "Verificando que Docker puede alcanzar postgres..."
-DOCKER_SUBNET="172.17.0.0/16"
-if sudo grep -qE "host.*all.*${DOCKER_SUBNET}" /etc/postgresql/*/*/pg_hba.conf 2>/dev/null \
-   || sudo grep -qE "host.*all.*0\.0\.0\.0/0" /etc/postgresql/*/*/pg_hba.conf 2>/dev/null; then
-  ok "pg_hba.conf permite conexiones desde Docker"
+[ "$DB_PASSWORD" = "$DB_PASSWORD2" ] || die "Las contraseñas no coinciden."
+[ -n "$DB_PASSWORD" ] || die "La contraseña no puede estar vacía."
+
+sudo -u postgres psql -c "ALTER USER postgres PASSWORD '${DB_PASSWORD}';" 2>/dev/null
+ok "Contraseña del usuario 'postgres' configurada"
+
+# ── 4e. Habilitar TCP en postgresql.conf ──────────────────────────────────────
+CURRENT_LISTEN=$(sudo grep -E "^listen_addresses" "$PG_CONF" 2>/dev/null | head -1 || echo "")
+if echo "$CURRENT_LISTEN" | grep -qE "\*|0\.0\.0\.0"; then
+  ok "PostgreSQL ya escucha en todas las interfaces"
 else
-  warn "No se encontró entrada para la subnet Docker (${DOCKER_SUBNET}) en pg_hba.conf."
-  warn "Si la app no puede conectar a la BD, agrega esta línea en pg_hba.conf:"
-  echo  "    host    all    postgres    172.17.0.0/16    scram-sha-256"
-  warn "Luego recarga postgres: sudo systemctl reload postgresql"
-  echo  ""
-  confirm "¿Continuar de todas formas?" || exit 0
+  info "Configurando listen_addresses = '*' en postgresql.conf..."
+  sudo sed -i "s/^#\?listen_addresses\s*=.*/listen_addresses = '*'/" "$PG_CONF"
+  ok "listen_addresses actualizado"
+  PG_RELOAD_NEEDED=true
+fi
+
+# ── 4f. Agregar regla Docker en pg_hba.conf ───────────────────────────────────
+DOCKER_SUBNET="172.17.0.0/16"
+HBA_RULE="host    all    postgres    ${DOCKER_SUBNET}    scram-sha-256"
+
+if sudo grep -qF "$DOCKER_SUBNET" "$PG_HBA" 2>/dev/null; then
+  ok "pg_hba.conf ya tiene regla para subnet Docker"
+else
+  info "Agregando regla Docker en pg_hba.conf..."
+  echo "$HBA_RULE" | sudo tee -a "$PG_HBA" > /dev/null
+  ok "Regla agregada: $HBA_RULE"
+  PG_RELOAD_NEEDED=true
+fi
+
+# ── 4g. Recargar PostgreSQL si hubo cambios ───────────────────────────────────
+if [ "${PG_RELOAD_NEEDED:-false}" = true ]; then
+  info "Recargando PostgreSQL..."
+  sudo systemctl reload postgresql 2>/dev/null || sudo pg_ctlcluster "$PG_VERSION" main reload 2>/dev/null || \
+    warn "No se pudo recargar automáticamente. Ejecuta: sudo systemctl reload postgresql"
+  ok "PostgreSQL recargado"
 fi
 
 # ══════════════════════════════════════════════════════════════════════════════
