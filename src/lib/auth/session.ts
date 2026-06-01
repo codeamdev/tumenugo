@@ -25,11 +25,16 @@ export async function getSession(): Promise<AccessPayload | null> {
 }
 
 export async function requireSuperadminSession(): Promise<SuperadminAccessPayload> {
-  const session = await getSession()
-  if (!session || session.type !== 'superadmin') {
-    redirect('/superadmin/login')
+  // Lee la cookie de superadmin directamente — no depende del header x-is-superadmin
+  // que solo está presente cuando se accede por subdominio admin.
+  const token = getAccessToken('superadmin')
+  if (token) {
+    try {
+      const payload = await verifyAccessToken(token)
+      if (payload.type === 'superadmin') return payload as SuperadminAccessPayload
+    } catch {}
   }
-  return session
+  redirect('/superadmin/login')
 }
 
 export async function requireTenantSession(
