@@ -52,8 +52,10 @@ export function ConfigForm({ defaultTenantSlug, tenants }: Props) {
       <CardHeader>
         <CardTitle>Tenant por defecto</CardTitle>
         <CardDescription>
-          Tenant que se usa cuando se accede por IP directa o dominio raíz, sin subdominio.
-          Al migrar a subdominios, selecciona &quot;Sin tenant por defecto&quot;.
+          Registra qué tenant es el predeterminado. Después de guardar, actualiza
+          <code className="mx-1 px-1 rounded bg-muted text-xs">DEFAULT_TENANT_SLUG</code>
+          en el archivo <code className="px-1 rounded bg-muted text-xs">.env.production</code> del
+          servidor y reinicia el contenedor para que tome efecto.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
