@@ -19,7 +19,7 @@ async function resolveDefaultTenantSlug(origin: string): Promise<string> {
   } catch {
     // Mantener valor cacheado o caer en env var
   }
-  return _cachedDefaultSlug ?? (process.env.DEFAULT_TENANT_SLUG ?? '')
+  return _cachedDefaultSlug || process.env.DEFAULT_TENANT_SLUG || ''
 }
 
 function extractSubdomain(hostname: string): string | null {

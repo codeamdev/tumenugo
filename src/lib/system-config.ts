@@ -11,10 +11,11 @@ export async function getDefaultTenantSlug(): Promise<string> {
     const [row] = await publicDb.select().from(systemConfig).limit(1)
     _cachedSlug = row?.defaultTenantSlug ?? ''
     _cacheExpiry = Date.now() + 60_000
-  } catch {
+  } catch (err) {
+    console.error('[system-config] Error leyendo system_config desde BD:', err)
     _cachedSlug ??= ''
   }
-  return _cachedSlug
+  return _cachedSlug || ''
 }
 
 export async function setDefaultTenantSlug(slug: string): Promise<void> {
