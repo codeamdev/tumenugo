@@ -19,7 +19,8 @@ services:
       args:
         NEXT_PUBLIC_BASE_DOMAIN: ${NEXT_PUBLIC_BASE_DOMAIN}
         NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
-    image: cafeteria-app:latest
+    image: tumenugo-app:latest
+    container_name: tumenugo-app
     restart: unless-stopped
     env_file: .env.production
     environment:
@@ -49,7 +50,7 @@ services:
       context: .
       dockerfile: Dockerfile
       target: migrator
-    image: cafeteria-migrator:latest
+    image: tumenugo-migrator:latest
     command: sh -c "npm run db:migrate:public && npm run db:migrate:tenants"
     env_file: .env.production
     network_mode: host

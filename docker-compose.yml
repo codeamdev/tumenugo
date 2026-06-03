@@ -1,12 +1,12 @@
-version: '3.9'
-
-# Uso:
-#   docker compose --env-file .env.production build
-#   docker compose --env-file .env.production run --rm migrate
-#   docker compose --env-file .env.production up -d
+# docker-compose.phase1.yml — Fase 1: IP pública, sin dominio
 #
-# O usa el script automatizado:
-#   bash scripts/deploy-docker.sh
+# Usa network_mode: host (igual que catalogo) para conectar al PostgreSQL
+# del sistema directamente por 127.0.0.1 sin cambios en pg_hba.conf.
+#
+# Uso:
+#   docker compose -f docker-compose.phase1.yml --env-file .env.production build
+#   docker compose -f docker-compose.phase1.yml --env-file .env.production --profile migrate run --rm migrate
+#   docker compose -f docker-compose.phase1.yml --env-file .env.production up -d
 
 services:
 
@@ -17,30 +17,22 @@ services:
       dockerfile: Dockerfile
       target: runner
       args:
-        # NEXT_PUBLIC_* se hornean en el bundle durante el build.
-        # Se leen del archivo .env.production pasado con --env-file.
         NEXT_PUBLIC_BASE_DOMAIN: ${NEXT_PUBLIC_BASE_DOMAIN}
         NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
-    image: cafeteria-app:latest
+    image: tumenugo-app:latest
     restart: unless-stopped
     env_file: .env.production
     environment:
       NODE_ENV: production
-      PORT: "3000"
+      PORT: "4821"      # Puerto no estándar, distinto al 3000 de catalogo
       HOSTNAME: "0.0.0.0"
-    expose:
-      - "3000"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - cafeteria
+    network_mode: host  # Accede a postgres del sistema vía 127.0.0.1 sin cambios en pg_hba.conf
     healthcheck:
       test:
         - "CMD"
         - "node"
         - "-e"
-        - "require('http').get('http://localhost:3000/api/auth/me',(r)=>r.statusCode<500?process.exit(0):process.exit(1)).on('error',()=>process.exit(1))"
+        - "require('http').get('http://localhost:4821/api/auth/me',(r)=>r.statusCode<500?process.exit(0):process.exit(1)).on('error',()=>process.exit(1))"
       interval: 30s
       timeout: 10s
       start_period: 60s
@@ -51,11 +43,7 @@ services:
         max-size: "50m"
         max-file: "5"
 
-  # ── Migrations ──────────────────────────────────────────────────────────────
-  # Servicio one-shot para aplicar migraciones. Solo se ejecuta manualmente.
-  # Requiere que postgres esté healthy antes de correr.
-  #
-  # Ejecutar: docker compose --env-file .env.production run --rm migrate
+  # ── Migrations (one-shot) ────────────────────────────────────────────────────
   migrate:
     build:
       context: .
@@ -64,69 +52,6 @@ services:
     image: cafeteria-migrator:latest
     command: sh -c "npm run db:migrate:public && npm run db:migrate:tenants"
     env_file: .env.production
-    networks:
-      - cafeteria
-    depends_on:
-      postgres:
-        condition: service_healthy
+    network_mode: host
     profiles:
       - migrate
-
-  # ── PostgreSQL ───────────────────────────────────────────────────────────────
-  postgres:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: cafeteria
-      POSTGRES_USER: ${DB_USER:-cafeteria_app}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      # Tuning básico de producción
-      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    networks:
-      - cafeteria
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-cafeteria_app} -d cafeteria"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "20m"
-        max-file: "3"
-
-  # ── Nginx reverse proxy ─────────────────────────────────────────────────────
-  nginx:
-    image: nginx:alpine
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/proxy_params:/etc/nginx/proxy_params:ro
-      - ./nginx/ssl:/etc/nginx/ssl:ro        # Cloudflare Origin Certificate
-      - nginx_logs:/var/log/nginx
-    depends_on:
-      app:
-        condition: service_healthy
-    networks:
-      - cafeteria
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "50m"
-        max-file: "7"
-
-volumes:
-  pgdata:
-    driver: local
-  nginx_logs:
-    driver: local
-
-networks:
-  cafeteria:
-    driver: bridge
