@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { eq, and } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { requireTenantSession } from '@/lib/auth/session'
 import { requireActiveTenant } from '@/lib/tenant'
 import { withTenant } from '@/lib/db/tenant-db'
-import { orders, orderItems, products } from '@/lib/db/schema/tenant'
-import { calcItemTotal } from '@/lib/order-calc'
+import { orders, orderItems, products, taxRates } from '@/lib/db/schema/tenant'
+import { calcItemTotal, calcOrderTotals } from '@/lib/order-calc'
 
+// POST /api/tenant/orders/[id]/items
+// Legacy endpoint — canonical logic is PATCH action=add_items on [id]/route.ts.
+// This endpoint delegates to the same full recalculation so both code paths
+// produce identical results.
 const addItemSchema = z.object({
   productId: z.string().uuid(),
   quantity: z.number().int().min(1),
@@ -35,8 +39,16 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       if (!prod) throw new Error('Product not found')
 
       const unitPrice = parseFloat(prod.price)
-      const modifiersTotal = body.modifiers.reduce((s, m) => s + m.priceDelta, 0)
-      const itemTotal = Math.round((unitPrice + modifiersTotal) * body.quantity * 100) / 100
+      const cartItem = {
+        id: 'new-0',
+        productId: body.productId,
+        productName: prod.name,
+        unitPrice,
+        quantity: body.quantity,
+        modifiers: body.modifiers,
+        notes: body.notes ?? '',
+      }
+      const itemTotal = calcItemTotal(cartItem)
 
       await db.insert(orderItems).values({
         orderId: params.id,
@@ -45,20 +57,40 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         quantity: body.quantity,
         unitPrice: String(unitPrice),
         modifierSnapshot: body.modifiers.map((m) => ({ ...m, priceDelta: String(m.priceDelta) })),
-        modifiersTotal: String(modifiersTotal),
+        modifiersTotal: String(body.modifiers.reduce((s, m) => s + m.priceDelta, 0)),
         itemTotal: String(itemTotal),
         notes: body.notes,
         status: 'pending',
       })
 
-      // Recalculate order subtotal
-      const allItems = await db.select().from(orderItems).where(eq(orderItems.orderId, params.id))
-      const newSubtotal = allItems.reduce((s, i) => s + parseFloat(i.itemTotal), 0)
+      // Recalculate using canonical calcOrderTotals (same as PATCH add_items)
+      const allTaxes = await db.select().from(taxRates)
+      const taxMap = Object.fromEntries(allTaxes.map((t) => [t.id, t]))
+
+      const addedTotals = calcOrderTotals([cartItem], [{
+        id: prod.id,
+        taxRateId: prod.taxRateId ?? null,
+        taxRate: prod.taxRateId ? parseFloat(taxMap[prod.taxRateId]?.rate ?? '0') : null,
+        taxName: prod.taxRateId ? taxMap[prod.taxRateId]?.name ?? null : null,
+      }], { deliveryFee: 0 })
+
+      // Merge tax breakdown
+      const existingTax = (order.taxBreakdown as { name: string; rate: number; amount: number }[]) ?? []
+      const merged: Record<string, { name: string; rate: number; amount: number }> = {}
+      for (const tl of existingTax) merged[tl.name] = { ...tl }
+      for (const tl of addedTotals.taxLines) {
+        merged[tl.name] = merged[tl.name]
+          ? { ...merged[tl.name], amount: merged[tl.name].amount + tl.amount }
+          : { name: tl.name, rate: tl.rate, amount: tl.amount }
+      }
+
       await db
         .update(orders)
         .set({
-          subtotal: String(Math.round(newSubtotal * 100) / 100),
-          total: String(Math.round(newSubtotal * 100) / 100),
+          subtotal: String(parseFloat(order.subtotal ?? '0') + addedTotals.subtotal),
+          taxAmount: String(parseFloat(order.taxAmount ?? '0') + addedTotals.taxTotal),
+          taxBreakdown: Object.values(merged),
+          total: String(parseFloat(order.total ?? '0') + addedTotals.total),
           updatedAt: new Date(),
         })
         .where(eq(orders.id, params.id))

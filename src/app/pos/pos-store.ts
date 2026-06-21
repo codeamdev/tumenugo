@@ -2,7 +2,7 @@
 
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { calcOrderTotals, type CartItem, type OrderTotals } from '@/lib/order-calc'
+import { calcOrderTotals, type CalcItem, type OrderTotals } from '@/lib/order-calc'
 
 // We use a lightweight state manager (zustand) per browser tab.
 // No server state here — that's in the API.
@@ -16,7 +16,7 @@ export interface ActiveOrder {
   localId: string
   serverId?: string        // set after saving to server
   origin: OrderOrigin
-  items: CartItem[]
+  items: CalcItem[]
   notes: string
   tipPercent: number
   couponDiscount: number
@@ -29,7 +29,7 @@ interface POSState {
   // actions
   newOrder: (origin: OrderOrigin) => string
   setActiveOrder: (id: string) => void
-  addItem: (orderId: string, item: Omit<CartItem, 'id'>) => void
+  addItem: (orderId: string, item: Omit<CalcItem, 'id'>) => void
   removeItem: (orderId: string, itemId: string) => void
   updateItemQty: (orderId: string, itemId: string, qty: number) => void
   updateItemNotes: (orderId: string, itemId: string, notes: string) => void

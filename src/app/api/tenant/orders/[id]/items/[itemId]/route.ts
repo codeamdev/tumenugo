@@ -3,16 +3,17 @@ import { eq, and, ne } from 'drizzle-orm'
 import { requireTenantSession } from '@/lib/auth/session'
 import { requireActiveTenant } from '@/lib/tenant'
 import { withTenant } from '@/lib/db/tenant-db'
-import { orders, orderItems } from '@/lib/db/schema/tenant'
+import { orders, orderItems, products, taxRates } from '@/lib/db/schema/tenant'
+import { calcItemTotal, calcOrderTotals } from '@/lib/order-calc'
+import type { ProductSnapshot } from '@/lib/db/schema/tenant'
 
 // DELETE /api/tenant/orders/[id]/items/[itemId]
-// Marks a single item as cancelled and recalculates the order total.
-// The order must not be closed or cancelled.
+// Marks a single item as cancelled and recalculates the order total from scratch.
 export async function DELETE(
   _: NextRequest,
   { params }: { params: { id: string; itemId: string } },
 ) {
-  const session = await requireTenantSession()
+  await requireTenantSession()
   const tenant = await requireActiveTenant()
 
   const result = await withTenant(tenant.schemaName, async (db) => {
@@ -31,34 +32,72 @@ export async function DELETE(
       .set({ status: 'cancelled' })
       .where(eq(orderItems.id, params.itemId))
 
-    // Recalculate totals from non-cancelled items only
+    // Recalculate totals correctly from all remaining active items.
+    // Fetch per-item tax rates from the products table to avoid the average-ratio bug.
     const activeItems = await db
       .select()
       .from(orderItems)
       .where(and(eq(orderItems.orderId, params.id), ne(orderItems.status, 'cancelled')))
 
-    const newSubtotal = activeItems.reduce((s, i) => s + parseFloat(i.itemTotal ?? '0'), 0)
-    const newTaxAmount = activeItems.reduce((s, i) => {
-      // itemTotal already includes the item's portion; tax was embedded. Re-use existing ratio.
-      return s
-    }, parseFloat(order.taxAmount ?? '0'))
+    const productIds = Array.from(new Set(activeItems.map((i) => i.productId).filter(Boolean) as string[]))
+    const allProds = productIds.length > 0
+      ? await db.select().from(products).where(
+          productIds.length === 1
+            ? eq(products.id, productIds[0])
+            : eq(products.id, productIds[0]) // handled below via map
+        )
+      : []
 
-    // Simpler: keep tax proportional — subtract cancelled item's contribution
-    const cancelledItemTotal = parseFloat(item.itemTotal ?? '0')
-    const prevTotal = parseFloat(order.total ?? '0')
-    const prevSubtotal = parseFloat(order.subtotal ?? '0')
-    const prevTax = parseFloat(order.taxAmount ?? '0')
-    const taxRatio = prevSubtotal > 0 ? prevTax / prevSubtotal : 0
-    const newSub = Math.max(0, prevSubtotal - cancelledItemTotal)
-    const newTax = Math.round(newSub * taxRatio * 100) / 100
-    const newTotal = Math.max(0, prevTotal - cancelledItemTotal - (prevTax - newTax))
+    // Fetch all needed products individually to avoid requiring `inArray` import churn
+    const prodMap: Record<string, typeof products.$inferSelect> = {}
+    for (const pid of productIds) {
+      const [p] = await db.select().from(products).where(eq(products.id, pid)).limit(1)
+      if (p) prodMap[pid] = p
+    }
+
+    const allTaxes = await db.select().from(taxRates)
+    const taxMap = Object.fromEntries(allTaxes.map((t) => [t.id, t]))
+
+    // Build CalcItems from stored order items so calcOrderTotals produces exact totals.
+    const calcItems = activeItems.map((i, idx) => {
+      const snap = i.modifierSnapshot as Array<{ groupName: string; modifierName: string; priceDelta: string }> | null
+      return {
+        id: `item-${idx}`,
+        productId: i.productId ?? null,
+        productName: (i.productSnapshot as ProductSnapshot)?.name ?? '',
+        unitPrice: parseFloat(i.unitPrice ?? '0'),
+        quantity: i.quantity,
+        modifiers: (snap ?? []).map((m) => ({ ...m, priceDelta: parseFloat(m.priceDelta) })),
+        notes: i.notes ?? '',
+      }
+    })
+
+    const prodsForCalc = Object.values(prodMap).map((p) => ({
+      id: p.id,
+      taxRateId: p.taxRateId ?? null,
+      taxRate: p.taxRateId ? parseFloat(taxMap[p.taxRateId]?.rate ?? '0') : null,
+      taxName: p.taxRateId ? taxMap[p.taxRateId]?.name ?? null : null,
+    }))
+
+    // Preserve existing tip and deliveryFee since we're only cancelling an item
+    const prevTip = parseFloat(order.tipAmount ?? '0')
+    const prevDeliveryFee = parseFloat(order.deliveryFee ?? '0')
+    const prevDiscount = parseFloat(order.discountAmount ?? '0')
+
+    const recalc = calcOrderTotals(calcItems, prodsForCalc, {
+      couponDiscount: prevDiscount,
+      deliveryFee: prevDeliveryFee,
+    })
+    // Re-apply tip as absolute amount (not percent) since we stored it as amount
+    const newTotal = Math.max(0, recalc.total + prevTip)
 
     await db
       .update(orders)
       .set({
-        subtotal: String(Math.round(newSub * 100) / 100),
-        taxAmount: String(newTax),
-        total: String(Math.round(newTotal * 100) / 100),
+        subtotal: String(recalc.subtotal),
+        taxAmount: String(recalc.taxTotal),
+        taxBreakdown: recalc.taxLines.map((l) => ({ name: l.name, rate: l.rate, amount: l.amount })),
+        total: String(newTotal),
         updatedAt: new Date(),
       })
       .where(eq(orders.id, params.id))
@@ -66,9 +105,9 @@ export async function DELETE(
     return 'ok'
   })
 
-  if (result === 'not_found')       return NextResponse.json({ error: 'Pedido no encontrado' }, { status: 404 })
-  if (result === 'locked')          return NextResponse.json({ error: 'El pedido está cerrado o cancelado' }, { status: 422 })
-  if (result === 'item_not_found')  return NextResponse.json({ error: 'Ítem no encontrado' }, { status: 404 })
+  if (result === 'not_found')         return NextResponse.json({ error: 'Pedido no encontrado' }, { status: 404 })
+  if (result === 'locked')            return NextResponse.json({ error: 'El pedido está cerrado o cancelado' }, { status: 422 })
+  if (result === 'item_not_found')    return NextResponse.json({ error: 'Ítem no encontrado' }, { status: 404 })
   if (result === 'already_cancelled') return NextResponse.json({ error: 'El ítem ya está cancelado' }, { status: 422 })
 
   return NextResponse.json({ ok: true })

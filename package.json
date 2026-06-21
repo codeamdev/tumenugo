@@ -21,7 +21,9 @@
     "tenant:user:create": "tsx scripts/create-tenant-user.ts",
     "tenant:change-password": "tsx scripts/change-tenant-password.ts",
     "superadmin:create": "tsx scripts/create-superadmin.ts",
-    "superadmin:change-password": "tsx scripts/change-superadmin-password.ts"
+    "superadmin:change-password": "tsx scripts/change-superadmin-password.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
@@ -77,6 +79,7 @@
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.15",
     "tsx": "^4.19.2",
-    "typescript": "^5.6.3"
+    "typescript": "^5.6.3",
+    "vitest": "^3.2.6"
   }
 }

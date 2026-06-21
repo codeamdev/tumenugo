@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { formatCurrency } from '@/lib/utils'
 import { Plus, Minus } from 'lucide-react'
-import type { CartItem } from '@/lib/order-calc'
+import type { CalcItem } from '@/lib/order-calc'
 
 interface ModifierOption {
   id: string
@@ -42,7 +42,7 @@ interface Props {
   product: ProductData
   currencySign: string
   onClose: () => void
-  onAdd: (item: Omit<CartItem, 'id'>) => void
+  onAdd: (item: Omit<CalcItem, 'id'>) => void
 }
 
 export function ModifiersModal({ product, currencySign, onClose, onAdd }: Props) {

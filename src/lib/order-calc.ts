@@ -1,21 +1,22 @@
 /**
  * Pure order calculation logic — no DB, no side effects.
  * Used by frontend (live totals) and backend (close-order validation).
+ * Interface names CalcItem/CalcModifier are canonical (match mobile).
  */
 
-export interface CartModifier {
+export interface CalcModifier {
   groupName: string
   modifierName: string
   priceDelta: number
 }
 
-export interface CartItem {
+export interface CalcItem {
   id: string          // local UUID
   productId: string | null
   productName: string
   unitPrice: number
   quantity: number
-  modifiers: CartModifier[]
+  modifiers: CalcModifier[]
   notes: string
 }
 
@@ -44,15 +45,19 @@ export interface ProductForCalc {
   taxRate?: number | null
 }
 
+export function round2(n: number): number {
+  return Math.round(n * 100) / 100
+}
+
 /** Calculate item total = (unitPrice + sum(modifiers)) * quantity */
-export function calcItemTotal(item: CartItem): number {
+export function calcItemTotal(item: CalcItem): number {
   const modifiersTotal = item.modifiers.reduce((s, m) => s + m.priceDelta, 0)
   return round2((item.unitPrice + modifiersTotal) * item.quantity)
 }
 
 /** Calculate full order totals. */
 export function calcOrderTotals(
-  items: CartItem[],
+  items: CalcItem[],
   products: ProductForCalc[],
   options: {
     couponDiscount?: number
@@ -106,8 +111,4 @@ export function calcOrderTotals(
 
 export function calcChange(received: number, total: number): number {
   return round2(received - total)
-}
-
-function round2(n: number): number {
-  return Math.round(n * 100) / 100
 }

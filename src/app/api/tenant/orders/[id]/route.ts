@@ -254,7 +254,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
         const newSubtotal = parseFloat(order.subtotal ?? '0') + addedTotals.subtotal
         const newTaxAmount = parseFloat(order.taxAmount ?? '0') + addedTotals.taxTotal
-        const newTotal = parseFloat(order.total ?? '0') + addedTotals.subtotal + addedTotals.taxTotal
+        // Use addedTotals.total (not subtotal+taxTotal separately) so tip/delivery
+        // contributions from new items are included correctly if ever added.
+        const newTotal = parseFloat(order.total ?? '0') + addedTotals.total
 
         const [updatedOrder] = await db
           .update(orders)

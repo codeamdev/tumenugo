@@ -16,7 +16,7 @@ import {
   Plus, Minus, Trash2, Search, UtensilsCrossed, Truck, BarChart3,
   ChevronLeft, RefreshCw, LogOut, Clock, CheckCircle2,
 } from 'lucide-react'
-import type { CartItem } from '@/lib/order-calc'
+import type { CalcItem } from '@/lib/order-calc'
 import type { PaymentMethodConfig } from '@/lib/payment-methods'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -273,7 +273,7 @@ export function PedidosScreen({
 
   const cartTotals = useMemo(() => {
     if (!localOrder || localOrder.items.length === 0) return null
-    const cartItems: CartItem[] = localOrder.items.map((i) => ({
+    const cartItems: CalcItem[] = localOrder.items.map((i) => ({
       id: i.id,
       productId: i.productId,
       productName: i.name,

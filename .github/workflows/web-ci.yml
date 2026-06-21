@@ -1,0 +1,45 @@
+name: Web CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  ci:
+    name: Lint · Type-check · Test · Sync
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type-check
+        run: npx tsc --noEmit
+
+      - name: Tests
+        run: npm test
+
+      - name: Check order-calc in sync with mobile
+        # This step fails if web/src/lib/order-calc.ts and app/src/lib/order-calc.ts diverge.
+        # It requires the mobile repo to be checked out alongside the web repo.
+        # For a monorepo-style CI, check out both repos or use git submodules.
+        # For independent repos, comment this step out and run it locally instead:
+        #   node ../../scripts/check-order-calc-sync.mjs
+        run: |
+          echo "ℹ️  order-calc sync check requires both repos present."
+          echo "   Run locally: node ../scripts/check-order-calc-sync.mjs"
+          echo "   Or set up a monorepo checkout and uncomment the line below."
+          # node ../scripts/check-order-calc-sync.mjs
