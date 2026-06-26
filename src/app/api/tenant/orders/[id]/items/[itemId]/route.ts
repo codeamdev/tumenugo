@@ -40,15 +40,7 @@ export async function DELETE(
       .where(and(eq(orderItems.orderId, params.id), ne(orderItems.status, 'cancelled')))
 
     const productIds = Array.from(new Set(activeItems.map((i) => i.productId).filter(Boolean) as string[]))
-    const allProds = productIds.length > 0
-      ? await db.select().from(products).where(
-          productIds.length === 1
-            ? eq(products.id, productIds[0])
-            : eq(products.id, productIds[0]) // handled below via map
-        )
-      : []
 
-    // Fetch all needed products individually to avoid requiring `inArray` import churn
     const prodMap: Record<string, typeof products.$inferSelect> = {}
     for (const pid of productIds) {
       const [p] = await db.select().from(products).where(eq(products.id, pid)).limit(1)

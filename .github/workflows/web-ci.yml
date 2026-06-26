@@ -33,13 +33,25 @@ jobs:
         run: npm test
 
       - name: Check order-calc in sync with mobile
-        # This step fails if web/src/lib/order-calc.ts and app/src/lib/order-calc.ts diverge.
-        # It requires the mobile repo to be checked out alongside the web repo.
-        # For a monorepo-style CI, check out both repos or use git submodules.
-        # For independent repos, comment this step out and run it locally instead:
-        #   node ../../scripts/check-order-calc-sync.mjs
         run: |
-          echo "ℹ️  order-calc sync check requires both repos present."
-          echo "   Run locally: node ../scripts/check-order-calc-sync.mjs"
-          echo "   Or set up a monorepo checkout and uncomment the line below."
-          # node ../scripts/check-order-calc-sync.mjs
+          git clone --depth=1 https://github.com/codeamdev/tumenugoapp.git /tmp/tumenugoapp
+          node -e "
+            const crypto = require('crypto');
+            const fs = require('fs');
+            const norm = (s) => s
+              .replace(/\/\*[\s\S]*?\*\//g, '')
+              .replace(/\/\/[^\n]*/g, '')
+              .replace(/\s+/g, ' ')
+              .trim();
+            const web = norm(fs.readFileSync('src/lib/order-calc.ts', 'utf8'));
+            const mob = norm(fs.readFileSync('/tmp/tumenugoapp/src/lib/order-calc.ts', 'utf8'));
+            const hw = crypto.createHash('sha256').update(web).digest('hex');
+            const hm = crypto.createHash('sha256').update(mob).digest('hex');
+            if (hw !== hm) {
+              console.error('✗ order-calc.ts OUT OF SYNC');
+              console.error('  web hash:    ' + hw.slice(0,16) + '...');
+              console.error('  mobile hash: ' + hm.slice(0,16) + '...');
+              process.exit(1);
+            }
+            console.log('✓ order-calc.ts in sync (' + hw.slice(0,16) + '...)');
+          "

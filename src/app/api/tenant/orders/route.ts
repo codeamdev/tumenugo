@@ -34,11 +34,20 @@ const createSchema = z.object({
   localId: z.string().uuid().optional(),
 })
 
+const ORDER_STATUSES = ['new', 'sent', 'preparing', 'ready', 'delivered', 'closed', 'cancelled'] as const
+type OrderStatusValue = typeof ORDER_STATUSES[number]
+
 export async function GET(request: NextRequest) {
   await requireTenantSession()
   const tenant = await requireActiveTenant()
   const { searchParams } = new URL(request.url)
-  const status = searchParams.get('status')
+  const rawStatus = searchParams.get('status')
+
+  // Validate status param before passing to DB to return 400 instead of 500
+  if (rawStatus && !(ORDER_STATUSES as readonly string[]).includes(rawStatus)) {
+    return NextResponse.json({ error: `Estado inválido: ${rawStatus}` }, { status: 400 })
+  }
+  const status = rawStatus as OrderStatusValue | null
 
   const historial = searchParams.get('historial') === 'true'
 
@@ -46,7 +55,7 @@ export async function GET(request: NextRequest) {
     const orderList = historial
       ? await db.select().from(orders).where(inArray(orders.status, ['closed', 'cancelled'] as any[])).orderBy(desc(orders.createdAt))
       : status
-        ? await db.select().from(orders).where(eq(orders.status, status as any)).orderBy(desc(orders.createdAt))
+        ? await db.select().from(orders).where(eq(orders.status, status)).orderBy(desc(orders.createdAt))
         : await db.select().from(orders).where(and(ne(orders.status, 'closed'), ne(orders.status, 'cancelled'))).orderBy(desc(orders.createdAt))
 
     // Sync table status: free any occupied table with no active order
