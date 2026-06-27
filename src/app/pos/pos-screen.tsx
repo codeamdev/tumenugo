@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { usePOSStore, type ActiveOrder, type OrderOrigin } from './pos-store'
 import { calcOrderTotals, calcChange } from '@/lib/order-calc'
 import { formatCurrency } from '@/lib/utils'
@@ -65,6 +65,7 @@ export function POSScreen({ categories, products, tables, userId, tenantName, cu
   const { toast } = useToast()
   const store = usePOSStore()
 
+  const searchRef = useRef<HTMLInputElement>(null)
   const [search, setSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [modifiersProduct, setModifiersProduct] = useState<ProductWithModifiers | null>(null)
@@ -122,6 +123,12 @@ export function POSScreen({ categories, products, tables, userId, tenantName, cu
     })
   }, [activeOrder, products])
 
+  function focusSearch() {
+    setSearch('')
+    // Small timeout so React flushes state before focusing
+    setTimeout(() => searchRef.current?.focus(), 50)
+  }
+
   function handleProductClick(product: ProductWithModifiers) {
     if (!activeOrder) {
       setShowNewOrderModal(true)
@@ -138,8 +145,13 @@ export function POSScreen({ categories, products, tables, userId, tenantName, cu
         modifiers: [],
         notes: '',
       })
-      // Auto-switch to cart on mobile after adding item
-      setMobileTab('cart')
+      // On mobile web: switch to cart; on desktop the catalog stays visible
+      if (typeof window !== 'undefined' && window.innerWidth < 768) {
+        setSearch('')
+        setMobileTab('cart')
+      } else {
+        focusSearch()
+      }
     }
   }
 
@@ -318,6 +330,7 @@ export function POSScreen({ categories, products, tables, userId, tenantName, cu
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
+              ref={searchRef}
               placeholder="Buscar producto..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -569,6 +582,7 @@ export function POSScreen({ categories, products, tables, userId, tenantName, cu
           onAdd={(item) => {
             store.addItem(activeOrder.localId, item)
             setModifiersProduct(null)
+            focusSearch()
           }}
         />
       )}
