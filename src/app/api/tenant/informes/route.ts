@@ -27,7 +27,10 @@ function endOfDay(dateStr: string): Date {
 }
 
 export async function GET(req: NextRequest) {
-  await requireTenantSession()
+  const session = await requireTenantSession()
+  if (!['admin', 'cajero'].includes(session.role)) {
+    return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
+  }
   const tenant = await requireActiveTenant()
 
   const { searchParams } = new URL(req.url)

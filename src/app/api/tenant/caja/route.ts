@@ -108,9 +108,12 @@ export async function GET(_: NextRequest) {
   })
 }
 
-// POST /api/tenant/caja — open or close register
+// POST /api/tenant/caja — open or close register (admin/cajero only)
 export async function POST(req: NextRequest) {
   const session = await requireTenantSession()
+  if (!['admin', 'cajero'].includes(session.role)) {
+    return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
+  }
   const tenant = await requireActiveTenant()
 
   try {
