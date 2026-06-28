@@ -47,7 +47,10 @@ export function TenantActionsMenu({ tenantId, tenantSlug, status }: Props) {
   }
 
   const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN ?? 'localhost'
-  const tenantUrl = `http://${tenantSlug}.${baseDomain}:3000`
+  const isLocal = baseDomain === 'localhost' || /^\d+\.\d+\.\d+\.\d+$/.test(baseDomain)
+  const tenantUrl = isLocal
+    ? `http://${tenantSlug}.${baseDomain}:3000`
+    : `https://${tenantSlug}.${baseDomain}`
 
   return (
     <DropdownMenu>
