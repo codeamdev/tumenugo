@@ -32,6 +32,8 @@ const createSchema = z.object({
   notes: z.string().optional(),
   items: z.array(itemSchema).min(1),
   localId: z.string().uuid().optional(),
+  // Si true, el pedido se crea directamente en estado 'sent' (va a cocina al instante)
+  sendToKitchen: z.boolean().default(false),
 })
 
 const ORDER_STATUSES = ['new', 'sent', 'preparing', 'ready', 'delivered', 'closed', 'cancelled'] as const
@@ -183,7 +185,7 @@ export async function POST(request: NextRequest) {
           displayCode,
           type: input.type,
           tableId: input.tableId,
-          status: 'new',
+          status: input.sendToKitchen ? 'sent' : 'new',
           customerName: input.customerName,
           customerPhone: input.customerPhone,
           customerAddress: input.customerAddress,
