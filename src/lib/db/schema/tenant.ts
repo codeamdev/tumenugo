@@ -65,7 +65,7 @@ export const registerStatusEnum = pgEnum('register_status', ['open', 'closed'])
 
 export const taxTypeEnum = pgEnum('tax_type', ['IVA', 'INC', 'none'])
 
-export const discountTypeEnum = pgEnum('discount_type', ['percentage', 'fixed'])
+// discountTypeEnum: reserved for future coupon/discount feature
 
 export const entryTypeEnum = pgEnum('entry_type', [
   'sale',
@@ -96,16 +96,7 @@ export const refreshTokens = pgTable('refresh_tokens', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 })
 
-export const auditLogs = pgTable('audit_logs', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id'),
-  action: text('action').notNull(),
-  entityType: text('entity_type'),
-  entityId: uuid('entity_id'),
-  payload: jsonb('payload'),
-  ipAddress: text('ip_address'),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-})
+// auditLogs: tabla definida en BD, pendiente de implementar escritura de auditoría
 
 // ─── Tables / Mesas ───────────────────────────────────────────────────────────
 
@@ -180,33 +171,8 @@ export const modifiers = pgTable('modifiers', {
   sortOrder: integer('sort_order').notNull().default(0),
 })
 
-export const combos = pgTable('combos', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  name: text('name').notNull(),
-  description: text('description'),
-  price: numeric('price', { precision: 12, scale: 2 }).notNull(),
-  isActive: boolean('is_active').notNull().default(true),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-})
-
-export const comboItems = pgTable('combo_items', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  comboId: uuid('combo_id').notNull(),
-  productId: uuid('product_id').notNull(),
-  quantity: integer('quantity').notNull().default(1),
-})
-
-export const coupons = pgTable('coupons', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  code: text('code').notNull().unique(),
-  discountType: discountTypeEnum('discount_type').notNull(),
-  discountValue: numeric('discount_value', { precision: 12, scale: 2 }).notNull(),
-  maxUses: integer('max_uses'),
-  usedCount: integer('used_count').notNull().default(0),
-  expiresAt: timestamp('expires_at', { withTimezone: true }),
-  isActive: boolean('is_active').notNull().default(true),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-})
+// combos, comboItems, coupons: tablas reservadas para funcionalidad futura
+// Existen en la BD pero no tienen rutas API ni UI implementadas aún
 
 // ─── Orders ───────────────────────────────────────────────────────────────────
 

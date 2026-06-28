@@ -4,34 +4,6 @@ import { getOfflineDB } from './db'
 
 const MAX_RETRIES = 3
 
-export async function cacheCatalog(products: object[]) {
-  const db = getOfflineDB()
-  const now = Date.now()
-  await db.catalogProducts.clear()
-  await db.catalogProducts.bulkPut(
-    products.map((p: any) => ({ ...p, cachedAt: now }))
-  )
-}
-
-export async function getCachedCatalog() {
-  const db = getOfflineDB()
-  const hour = 60 * 60 * 1000
-  const cutoff = Date.now() - hour
-  const products = await db.catalogProducts.filter((p) => p.cachedAt > cutoff).toArray()
-  return products
-}
-
-export async function queueOfflineOrder(localId: string, payload: object) {
-  const db = getOfflineDB()
-  await db.pendingOrders.add({
-    localId,
-    payload,
-    createdAt: Date.now(),
-    syncStatus: 'pending',
-    retries: 0,
-  })
-}
-
 export async function syncPendingOrders(): Promise<{ synced: number; failed: number }> {
   const db = getOfflineDB()
   const pending = await db.pendingOrders

@@ -39,11 +39,6 @@ export function slugify(text: string): string {
     .replace(/^-|-$/g, '')
 }
 
-/** Calculate tax amount given a subtotal and rate (percentage). */
-export function calcTax(subtotal: number, rate: number): number {
-  return Math.round(subtotal * (rate / 100) * 100) / 100
-}
-
 /** Round to 2 decimal places */
 export function round2(n: number): number {
   return Math.round(n * 100) / 100
