@@ -16,14 +16,41 @@ function localDateStr(): string {
   return `${y}-${m}-${d}`
 }
 
-function startOfDay(dateStr: string): Date {
+/**
+ * Calcula el offset UTC de la timezone dada comparando UTC noon vs local noon.
+ * Funciona con cualquier timezone y maneja DST correctamente.
+ */
+function getTzOffsetMs(dateStr: string, tz: string): number {
   const [y, m, d] = dateStr.split('-').map(Number)
-  return new Date(y, m - 1, d, 0, 0, 0, 0)
+  // Usamos el mediodía UTC como referencia (evita bordes de DST)
+  const noonUTC = new Date(Date.UTC(y, m - 1, d, 12, 0, 0, 0))
+  const localStr = noonUTC.toLocaleString('en-US', {
+    timeZone: tz,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+  // Puede venir como "07:00" o "24:00" (medianoche)
+  const [h, min] = localStr.replace('24', '0').split(':').map(Number)
+  return (12 - h) * 3_600_000 - min * 60_000
 }
 
-function endOfDay(dateStr: string): Date {
+function startOfDay(dateStr: string, tz = 'America/Bogota'): Date {
   const [y, m, d] = dateStr.split('-').map(Number)
-  return new Date(y, m - 1, d, 23, 59, 59, 999)
+  const offsetMs = getTzOffsetMs(dateStr, tz)
+  // Medianoche UTC + offset = medianoche en tz
+  return new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0) + offsetMs)
+}
+
+function endOfDay(dateStr: string, tz = 'America/Bogota'): Date {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const offsetMs = getTzOffsetMs(dateStr, tz)
+  // Medianoche UTC + offset + 24h - 1ms = fin del día en tz
+  return new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0) + offsetMs + 86_400_000 - 1)
+}
+
+function dateInTz(date: Date, tz: string): string {
+  return date.toLocaleDateString('en-CA', { timeZone: tz }) // formato YYYY-MM-DD
 }
 
 export async function GET(req: NextRequest) {
@@ -36,8 +63,9 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const fromStr = searchParams.get('from') ?? localDateStr()
   const toStr   = searchParams.get('to')   ?? localDateStr()
-  const from = startOfDay(fromStr)
-  const to   = endOfDay(toStr)
+  const tz  = (tenant as any).timezone ?? 'America/Bogota'
+  const from = startOfDay(fromStr, tz)
+  const to   = endOfDay(toStr, tz)
 
   const data = await withTenant(tenant.schemaName, async (db) => {
     // Pedidos cerrados y cobrados en el período
@@ -86,11 +114,11 @@ export async function GET(req: NextRequest) {
       byType[o.type] = (byType[o.type] ?? 0) + parseFloat(o.total ?? '0')
     }
 
-    // Daily series
+    // Daily series — usar fecha local del tenant (no UTC) para agrupar correctamente
     const daily: Record<string, number> = {}
     for (const o of closedOrders) {
       if (!o.closedAt) continue
-      const day = new Date(o.closedAt).toISOString().slice(0, 10)
+      const day = dateInTz(new Date(o.closedAt), tz)
       daily[day] = (daily[day] ?? 0) + parseFloat(o.total ?? '0')
     }
     const dailySeries = Object.entries(daily)
