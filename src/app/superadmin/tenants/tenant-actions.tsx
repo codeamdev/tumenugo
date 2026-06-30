@@ -10,7 +10,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Button } from '@/components/ui/button'
-import { MoreHorizontal, PowerOff, Power, ExternalLink } from 'lucide-react'
+import { MoreHorizontal, PowerOff, Power, ExternalLink, Users } from 'lucide-react'
+import Link from 'next/link'
 import { useToast } from '@/components/ui/use-toast'
 
 interface Props {
@@ -66,6 +67,12 @@ export function TenantActionsMenu({ tenantId, tenantSlug, status }: Props) {
             <ExternalLink className="h-4 w-4 mr-2" />
             Abrir panel
           </a>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href={`/superadmin/tenants/${tenantId}/users`}>
+            <Users className="h-4 w-4 mr-2" />
+            Gestionar usuarios
+          </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={toggleStatus}>
