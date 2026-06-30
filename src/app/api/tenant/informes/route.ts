@@ -142,16 +142,32 @@ export async function GET(req: NextRequest) {
         .from(cashRegisterEntries)
         .where(and(inArray(cashRegisterEntries.orderId, orderIds), eq(cashRegisterEntries.type, 'sale')))
 
-      const orderIdsWithEntries = new Set<string>()
-      for (const entry of entries) {
-        orderIdsWithEntries.add(entry.orderId!)
-        // Custom methods: paymentMethod='other', original key stored in notes
-        const isCustomKey = entry.paymentMethod === 'other' && entry.notes && methodLabels[entry.notes] !== undefined
-        const key = isCustomKey ? entry.notes! : (entry.paymentMethod ?? 'other')
-        byMethod[key] = (byMethod[key] ?? 0) + parseFloat(entry.amount ?? '0')
+      // Agrupar entradas por pedido
+      const entriesByOrder: Record<string, typeof entries> = {}
+      for (const e of entries) {
+        if (!entriesByOrder[e.orderId!]) entriesByOrder[e.orderId!] = []
+        entriesByOrder[e.orderId!].push(e)
       }
 
-      // Fallback for orders closed before cashRegisterEntries existed
+      // Para cada pedido, distribuir el TOTAL DEL PEDIDO (no el monto recibido)
+      // entre los métodos de pago en proporción a los montos ingresados.
+      // Ej: pedido de $24.000 pagado con $50.000 en efectivo → cash += $24.000 (no $50.000)
+      const orderIdsWithEntries = new Set<string>()
+      for (const o of closedOrders) {
+        const orderEntries = entriesByOrder[o.id]
+        if (!orderEntries?.length) continue
+        orderIdsWithEntries.add(o.id)
+        const orderTotal = parseFloat(o.total ?? '0')
+        const rawTotal   = orderEntries.reduce((s, e) => s + parseFloat(e.amount ?? '0'), 0)
+        for (const e of orderEntries) {
+          const isCustomKey = e.paymentMethod === 'other' && e.notes && methodLabels[e.notes] !== undefined
+          const key   = isCustomKey ? e.notes! : (e.paymentMethod ?? 'other')
+          const ratio = rawTotal > 0 ? parseFloat(e.amount ?? '0') / rawTotal : 1 / orderEntries.length
+          byMethod[key] = (byMethod[key] ?? 0) + orderTotal * ratio
+        }
+      }
+
+      // Fallback para pedidos sin entradas en caja
       for (const o of closedOrders) {
         if (!orderIdsWithEntries.has(o.id)) {
           const m = o.paymentMethod ?? 'other'

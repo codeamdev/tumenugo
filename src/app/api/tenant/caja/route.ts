@@ -73,12 +73,25 @@ export async function GET(_: NextRequest) {
         .from(cashRegisterEntries)
         .where(and(inArray(cashRegisterEntries.orderId, orderIds), eq(cashRegisterEntries.type, 'sale')))
 
-      const withEntries = new Set<string>()
+      // Agrupar por pedido para escalar al total del pedido (no al monto recibido)
+      const entriesByOrder: Record<string, typeof entries> = {}
       for (const e of entries) {
-        withEntries.add(e.orderId!)
-        const isCustomKey = e.paymentMethod === 'other' && e.notes && methodLabels[e.notes] !== undefined
-        const key = isCustomKey ? e.notes! : (e.paymentMethod ?? 'other')
-        byMethod[key] = (byMethod[key] ?? 0) + parseFloat(e.amount ?? '0')
+        if (!entriesByOrder[e.orderId!]) entriesByOrder[e.orderId!] = []
+        entriesByOrder[e.orderId!].push(e)
+      }
+      const withEntries = new Set<string>()
+      for (const o of closedOrders) {
+        const orderEntries = entriesByOrder[o.id]
+        if (!orderEntries?.length) continue
+        withEntries.add(o.id)
+        const orderTotal = parseFloat(o.total ?? '0')
+        const rawTotal   = orderEntries.reduce((s, e) => s + parseFloat(e.amount ?? '0'), 0)
+        for (const e of orderEntries) {
+          const isCustomKey = e.paymentMethod === 'other' && e.notes && methodLabels[e.notes] !== undefined
+          const key   = isCustomKey ? e.notes! : (e.paymentMethod ?? 'other')
+          const ratio = rawTotal > 0 ? parseFloat(e.amount ?? '0') / rawTotal : 1 / orderEntries.length
+          byMethod[key] = (byMethod[key] ?? 0) + orderTotal * ratio
+        }
       }
       for (const o of closedOrders) {
         if (!withEntries.has(o.id)) {
