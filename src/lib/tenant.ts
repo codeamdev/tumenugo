@@ -40,10 +40,16 @@ export async function getCurrentTenant(): Promise<Tenant | null> {
 
 /**
  * Like getCurrentTenant but throws if the tenant is not found or not active.
+ * Throws a special TENANT_SUSPENDED error when suspended so route handlers can return 403.
  */
+export class TenantSuspendedError extends Error {
+  constructor() { super('TENANT_SUSPENDED') }
+}
+
 export async function requireActiveTenant(): Promise<Tenant> {
   const tenant = await getCurrentTenant()
   if (!tenant) throw new Error('Tenant not found')
-  if (tenant.status !== 'active') throw new Error('Tenant suspended')
+  if (tenant.status === 'suspended') throw new TenantSuspendedError()
+  if (tenant.status !== 'active') throw new Error('Tenant inactive')
   return tenant
 }

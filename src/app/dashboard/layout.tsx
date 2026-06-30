@@ -1,6 +1,8 @@
 ﻿import { requireTenantSession } from '@/lib/auth/session'
-import { requireActiveTenant } from '@/lib/tenant'
+import { getCurrentTenant } from '@/lib/tenant'
 import { TenantSidebar } from '@/components/layout/tenant-sidebar'
+import { redirect } from 'next/navigation'
+import { SuspendedOverlay } from '@/components/layout/suspended-overlay'
 
 export default async function TenantDashboardLayout({
   children,
@@ -9,8 +11,17 @@ export default async function TenantDashboardLayout({
 }) {
   const [session, tenant] = await Promise.all([
     requireTenantSession(),
-    requireActiveTenant(),
+    getCurrentTenant(),
   ])
+
+  if (!tenant) redirect('/login')
+
+  // Tenant suspendido: muestra overlay informativo sin borrar nada
+  if (tenant.status === 'suspended') {
+    return <SuspendedOverlay tenantName={tenant.name} />
+  }
+
+  if (tenant.status !== 'active') redirect('/login')
 
   return (
     <div className="flex min-h-screen">
