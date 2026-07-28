@@ -26,18 +26,23 @@ export async function PATCH(
 
   try {
     const body = patchSchema.parse(await req.json())
-    const update: Record<string, unknown> = {}
-    if (body.name)     update.name     = body.name
-    if (body.role)     update.role     = body.role
-    if (body.isActive !== undefined) update.isActive = body.isActive
-    if (body.password) update.passwordHash = await hashPassword(body.password)
 
-    if (Object.keys(update).length === 0)
+    // Hash the password before entering the transaction
+    const passwordHash = body.password ? await hashPassword(body.password) : undefined
+
+    if (!body.name && !body.role && body.isActive === undefined && !passwordHash) {
       return NextResponse.json({ error: 'Sin campos a actualizar' }, { status: 400 })
+    }
 
+    // Use typed object literal so Drizzle correctly maps camelCase keys to SQL column names
     const [updated] = await withTenant(tenant.schemaName, async (db) =>
       db.update(users)
-        .set(update)
+        .set({
+          ...(body.name      !== undefined && { name:         body.name }),
+          ...(body.role      !== undefined && { role:         body.role }),
+          ...(body.isActive  !== undefined && { isActive:     body.isActive }),
+          ...(passwordHash   !== undefined && { passwordHash: passwordHash }),
+        })
         .where(eq(users.id, params.userId))
         .returning({ id: users.id, name: users.name, email: users.email, role: users.role })
     )
