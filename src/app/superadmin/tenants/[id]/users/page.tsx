@@ -96,7 +96,7 @@ export default function TenantUsersPage() {
   }
 
   async function handleResetPassword(userId: string) {
-    if (!resetPwValue || resetPwValue.length < 8) return
+    if (!resetPwValue || resetPwValue.length < 6) return
     setResetting(true)
     setError(''); setSuccess('')
     try {
@@ -216,16 +216,16 @@ export default function TenantUsersPage() {
                     <div className="flex items-center gap-2 pl-0 pt-1">
                       <Input
                         type="password"
-                        placeholder="Nueva contraseña (mín. 8 caracteres)"
+                        placeholder="Nueva contraseña (mín. 6 caracteres)"
                         value={resetPwValue}
                         onChange={(e) => setResetPwValue(e.target.value)}
                         className="max-w-xs"
-                        minLength={8}
+                        minLength={6}
                         autoFocus
                       />
                       <Button
                         size="sm"
-                        disabled={resetting || resetPwValue.length < 8}
+                        disabled={resetting || resetPwValue.length < 6}
                         onClick={() => handleResetPassword(u.id)}
                       >
                         {resetting ? 'Guardando...' : 'Guardar'}
