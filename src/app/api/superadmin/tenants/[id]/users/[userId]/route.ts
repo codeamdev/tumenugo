@@ -9,7 +9,7 @@ import { users } from '@/lib/db/schema/tenant'
 import { hashPassword } from '@/lib/auth/password'
 
 const patchSchema = z.object({
-  password: z.string().min(8).optional(),
+  password: z.string().min(6).optional(),
   name:     z.string().min(2).optional(),
   role:     z.enum(['admin', 'cajero', 'mesero', 'cocina']).optional(),
   isActive: z.boolean().optional(),
