@@ -41,6 +41,7 @@ export default async function EditarProductoPage({ params }: { params: { id: str
           prepTimeMin: data.product.prepTimeMin,
           isAvailable: data.product.isAvailable,
           sortOrder: data.product.sortOrder ?? 0,
+          flavors: data.product.flavors ?? [],
         }}
       />
     </div>

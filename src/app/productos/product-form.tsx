@@ -11,8 +11,7 @@ import {
 } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { AlertCircle } from 'lucide-react'
-import type { Category, TaxRate } from '@/lib/db/schema/tenant' // just reuse types
+import { AlertCircle, X, Plus } from 'lucide-react'
 
 interface Props {
   categories: { id: string; name: string; emoji?: string | null }[]
@@ -27,6 +26,7 @@ interface Props {
     prepTimeMin?: number | null
     isAvailable?: boolean
     sortOrder?: number
+    flavors?: string[] | null
   }
 }
 
@@ -35,6 +35,7 @@ export function ProductForm({ categories, taxRates, initial }: Props) {
   const isEdit = !!initial?.id
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [newFlavor, setNewFlavor] = useState('')
 
   const [form, setForm] = useState({
     name: initial?.name ?? '',
@@ -45,7 +46,19 @@ export function ProductForm({ categories, taxRates, initial }: Props) {
     prepTimeMin: initial?.prepTimeMin ?? 0,
     isAvailable: initial?.isAvailable ?? true,
     sortOrder: initial?.sortOrder ?? 0,
+    flavors: (initial?.flavors ?? []) as string[],
   })
+
+  function addFlavor() {
+    const trimmed = newFlavor.trim()
+    if (!trimmed || form.flavors.includes(trimmed)) return
+    setForm((f) => ({ ...f, flavors: [...f.flavors, trimmed] }))
+    setNewFlavor('')
+  }
+
+  function removeFlavor(fl: string) {
+    setForm((f) => ({ ...f, flavors: f.flavors.filter((x) => x !== fl) }))
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -58,6 +71,7 @@ export function ProductForm({ categories, taxRates, initial }: Props) {
       taxRateId: form.taxRateId === '__none__' ? null : form.taxRateId || null,
       prepTimeMin: Number(form.prepTimeMin),
       sortOrder: Number(form.sortOrder),
+      flavors: form.flavors,
     }
 
     try {
@@ -197,6 +211,45 @@ export function ProductForm({ categories, taxRates, initial }: Props) {
               {form.isAvailable ? 'Disponible para venta' : 'No disponible'}
             </button>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>Sabores</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Agrega los sabores disponibles para este producto. Al seleccionarlo en el POS, el cajero deberá elegir un sabor.
+          </p>
+          <div className="flex gap-2">
+            <Input
+              value={newFlavor}
+              onChange={(e) => setNewFlavor(e.target.value)}
+              placeholder="Ej: Fresa, Chocolate, Vainilla..."
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addFlavor() } }}
+            />
+            <Button type="button" variant="outline" onClick={addFlavor} disabled={!newFlavor.trim()}>
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
+          {form.flavors.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {form.flavors.map((fl) => (
+                <span
+                  key={fl}
+                  className="inline-flex items-center gap-1 rounded-full border px-3 py-1 text-sm font-medium bg-secondary"
+                >
+                  {fl}
+                  <button
+                    type="button"
+                    onClick={() => removeFlavor(fl)}
+                    className="ml-1 rounded-full hover:text-destructive transition-colors"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 

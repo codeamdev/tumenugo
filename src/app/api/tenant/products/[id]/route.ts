@@ -16,6 +16,7 @@ const updateSchema = z.object({
   isAvailable: z.boolean().optional(),
   sortOrder: z.number().int().optional(),
   imageUrl: z.string().url().optional().nullable(),
+  flavors: z.array(z.string().min(1)).optional(),
 })
 
 export async function GET(_: NextRequest, { params }: { params: { id: string } }) {

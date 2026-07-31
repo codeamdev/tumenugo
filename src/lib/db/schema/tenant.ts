@@ -145,6 +145,7 @@ export const products = pgTable('products', {
   imageUrl: text('image_url'),
   isAvailable: boolean('is_available').notNull().default(true),
   sortOrder: integer('sort_order').notNull().default(0),
+  flavors: jsonb('flavors').$type<string[]>().notNull().default([]),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 })
