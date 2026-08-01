@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { ModifiersModal } from './modifiers-modal'
+import { FlavorsModal } from './flavors-modal'
 import { NewOrderModal } from './new-order-modal'
 import { CloseOrderModal } from './close-order-modal'
 import { useToast } from '@/components/ui/use-toast'
@@ -30,6 +31,7 @@ interface ProductWithModifiers {
   taxName?: string | null
   isAvailable: boolean
   imageUrl?: string | null
+  flavors: string[]
   modifierGroups: {
     id: string
     name: string
@@ -69,6 +71,7 @@ export function POSScreen({ categories, products, tables, userId, tenantName, cu
   const [search, setSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [modifiersProduct, setModifiersProduct] = useState<ProductWithModifiers | null>(null)
+  const [flavorsProduct,   setFlavorsProduct]   = useState<ProductWithModifiers | null>(null)
   const [showNewOrderModal, setShowNewOrderModal] = useState(false)
   const [showCloseModal, setShowCloseModal] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -134,7 +137,9 @@ export function POSScreen({ categories, products, tables, userId, tenantName, cu
       setShowNewOrderModal(true)
       return
     }
-    if (product.modifierGroups.length > 0) {
+    if ((product.flavors?.length ?? 0) > 0) {
+      setFlavorsProduct(product)
+    } else if (product.modifierGroups.length > 0) {
       setModifiersProduct(product)
     } else {
       store.addItem(activeOrder.localId, {
@@ -386,7 +391,7 @@ export function POSScreen({ categories, products, tables, userId, tenantName, cu
                 <span className="mt-2 font-semibold text-primary">
                   {formatCurrency(product.price, currencySign)}
                 </span>
-                {product.modifierGroups.length > 0 && (
+                {((product.flavors?.length ?? 0) > 0 || product.modifierGroups.length > 0) && (
                   <span className="absolute top-2 right-2 h-1.5 w-1.5 rounded-full bg-primary" title="Tiene opciones" />
                 )}
               </button>
@@ -582,6 +587,26 @@ export function POSScreen({ categories, products, tables, userId, tenantName, cu
           onAdd={(item) => {
             store.addItem(activeOrder.localId, item)
             setModifiersProduct(null)
+            focusSearch()
+          }}
+        />
+      )}
+
+      {flavorsProduct && activeOrder && (
+        <FlavorsModal
+          product={flavorsProduct}
+          currencySign={currencySign}
+          onClose={() => setFlavorsProduct(null)}
+          onAdd={(flavor, qty) => {
+            store.addItem(activeOrder.localId, {
+              productId: flavorsProduct.id,
+              productName: flavorsProduct.name,
+              unitPrice: parseFloat(flavorsProduct.price),
+              quantity: qty,
+              modifiers: [],
+              notes: `Sabor: ${flavor}`,
+            })
+            setFlavorsProduct(null)
             focusSearch()
           }}
         />
