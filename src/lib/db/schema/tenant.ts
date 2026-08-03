@@ -267,6 +267,28 @@ export const cashRegisterEntries = pgTable('cash_register_entries', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 })
 
+// ─── Purchases / Compras ──────────────────────────────────────────────────────
+
+export const purchaseProducts = pgTable('purchase_products', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull(),
+  description: text('description'),
+  unit: text('unit').notNull().default('unidad'),
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+})
+
+export const purchases = pgTable('purchases', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  purchaseProductId: uuid('purchase_product_id'),
+  productName: text('product_name').notNull(),
+  value: numeric('value', { precision: 12, scale: 2 }).notNull(),
+  description: text('description'),
+  purchasedAt: timestamp('purchased_at', { withTimezone: true }).notNull().defaultNow(),
+  registeredBy: uuid('registered_by').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+})
+
 // ─── Inferred types ───────────────────────────────────────────────────────────
 
 export type User = typeof users.$inferSelect
@@ -280,6 +302,8 @@ export type Modifier = typeof modifiers.$inferSelect
 export type Order = typeof orders.$inferSelect
 export type OrderItem = typeof orderItems.$inferSelect
 export type CashRegister = typeof cashRegisters.$inferSelect
+export type PurchaseProduct = typeof purchaseProducts.$inferSelect
+export type Purchase = typeof purchases.$inferSelect
 
 export interface TaxBreakdownEntry {
   name: string
