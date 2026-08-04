@@ -9,6 +9,7 @@ import { purchases } from '@/lib/db/schema/tenant'
 const createSchema = z.object({
   purchaseProductId: z.string().uuid().optional(),
   productName: z.string().min(1).max(300),
+  quantity: z.string().regex(/^\d+(\.\d{1,3})?$/).default('1'),
   value: z.string().regex(/^\d+(\.\d{1,2})?$/),
   description: z.string().optional(),
   purchasedAt: z.string().datetime().optional(),
@@ -52,6 +53,7 @@ export async function POST(req: NextRequest) {
       db.insert(purchases).values({
         purchaseProductId: body.purchaseProductId ?? null,
         productName: body.productName,
+        quantity: body.quantity,
         value: body.value,
         description: body.description,
         purchasedAt: body.purchasedAt ? new Date(body.purchasedAt) : new Date(),

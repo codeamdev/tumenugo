@@ -71,7 +71,7 @@ export default function ComprasInformesPage() {
   const [data, setData] = useState<ReportData | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'resumen' | 'productos' | 'historial'>('resumen')
-  const [history, setHistory] = useState<{ id: string; productName: string; value: string; description: string | null; purchasedAt: string }[]>([])
+  const [history, setHistory] = useState<{ id: string; productName: string; quantity: string | null; value: string; description: string | null; purchasedAt: string }[]>([])
   const [loadingHist, setLoadingHist] = useState(false)
 
   const fmt = (n: number) => formatCurrency(n, data?.currencySign ?? '$')
@@ -288,7 +288,12 @@ export default function ComprasInformesPage() {
                 </div>
                 {history.map((p) => (
                   <div key={p.id} className="grid grid-cols-12 py-3 text-sm items-center">
-                    <span className="col-span-4 font-medium truncate pr-2">{p.productName}</span>
+                    <span className="col-span-4 font-medium truncate pr-2">
+                      {p.productName}
+                      {p.quantity && parseFloat(p.quantity) !== 1 && (
+                        <span className="ml-1 text-xs font-normal text-muted-foreground">×{parseFloat(p.quantity)}</span>
+                      )}
+                    </span>
                     <span className="col-span-4 text-muted-foreground truncate pr-2">{p.description ?? '—'}</span>
                     <span className="col-span-2 text-muted-foreground text-xs">
                       {new Date(p.purchasedAt).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}

@@ -282,6 +282,7 @@ export const purchases = pgTable('purchases', {
   id: uuid('id').primaryKey().defaultRandom(),
   purchaseProductId: uuid('purchase_product_id'),
   productName: text('product_name').notNull(),
+  quantity: numeric('quantity', { precision: 12, scale: 3 }).notNull().default('1'),
   value: numeric('value', { precision: 12, scale: 2 }).notNull(),
   description: text('description'),
   purchasedAt: timestamp('purchased_at', { withTimezone: true }).notNull().defaultNow(),

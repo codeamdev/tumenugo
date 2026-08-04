@@ -36,6 +36,7 @@ export function ComprasClient({ initialCatalog, initialRecent, currencySign }: P
   const [mode,        setMode]        = useState<'catalog' | 'libre'>('catalog')
   const [selectedId,  setSelectedId]  = useState('')
   const [freeName,    setFreeName]    = useState('')
+  const [quantity,    setQuantity]    = useState('1')
   const [value,       setValue]       = useState('')
   const [description, setDescription] = useState('')
 
@@ -48,9 +49,11 @@ export function ComprasClient({ initialCatalog, initialRecent, currencySign }: P
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(''); setSuccess('')
-    if (!productName.trim())         { setError('Selecciona o escribe un producto'); return }
+    if (!productName.trim())            { setError('Selecciona o escribe un producto'); return }
+    const qtyNum = parseFloat(quantity)
+    if (isNaN(qtyNum) || qtyNum <= 0)  { setError('Ingresa una cantidad válida'); return }
     const valNum = parseFloat(value)
-    if (isNaN(valNum) || valNum <= 0){ setError('Ingresa un valor válido'); return }
+    if (isNaN(valNum) || valNum <= 0)  { setError('Ingresa un valor válido'); return }
 
     setSaving(true)
     try {
@@ -60,6 +63,7 @@ export function ComprasClient({ initialCatalog, initialRecent, currencySign }: P
         body: JSON.stringify({
           purchaseProductId: mode === 'catalog' && selectedId ? selectedId : undefined,
           productName: productName.trim(),
+          quantity: qtyNum.toString(),
           value: valNum.toFixed(2),
           description: description.trim() || undefined,
         }),
@@ -68,7 +72,7 @@ export function ComprasClient({ initialCatalog, initialRecent, currencySign }: P
       if (!res.ok) throw new Error(data.error ?? 'Error al registrar')
 
       setSuccess(`Compra de "${productName}" registrada.`)
-      setValue(''); setDescription(''); setSelectedId(''); setFreeName('')
+      setValue(''); setDescription(''); setSelectedId(''); setFreeName(''); setQuantity('1')
 
       // Refresh list
       const listRes = await fetch('/api/tenant/purchases?limit=30')
@@ -184,6 +188,28 @@ export function ComprasClient({ initialCatalog, initialRecent, currencySign }: P
                   )}
                 </div>
 
+                {/* Cantidad */}
+                <div className="space-y-2">
+                  <Label htmlFor="quantity">
+                    Cantidad *
+                    {mode === 'catalog' && selectedId && (() => {
+                      const unit = catalog.find((p) => p.id === selectedId)?.unit
+                      return unit && unit !== 'unidad' ? (
+                        <span className="ml-1 text-xs text-muted-foreground">({unit})</span>
+                      ) : null
+                    })()}
+                  </Label>
+                  <Input
+                    id="quantity"
+                    type="number"
+                    min="0.001"
+                    step="0.5"
+                    value={quantity}
+                    onChange={(e) => setQuantity(e.target.value)}
+                    placeholder="Ej: 2"
+                  />
+                </div>
+
                 {/* Valor */}
                 <div className="space-y-2">
                   <Label htmlFor="value">Valor *</Label>
@@ -248,7 +274,12 @@ export function ComprasClient({ initialCatalog, initialRecent, currencySign }: P
                   {recent.map((p) => (
                     <div key={p.id} className="flex items-center justify-between gap-3 py-3">
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate">{p.productName}</p>
+                        <p className="font-medium text-sm truncate">
+                          {p.productName}
+                          {p.quantity && parseFloat(p.quantity) !== 1 && (
+                            <span className="ml-1.5 text-xs font-normal text-muted-foreground">×{parseFloat(p.quantity)}</span>
+                          )}
+                        </p>
                         {p.description && (
                           <p className="text-xs text-muted-foreground truncate">{p.description}</p>
                         )}
