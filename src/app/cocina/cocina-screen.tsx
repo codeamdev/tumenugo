@@ -22,6 +22,7 @@ interface KitchenOrder {
   status: 'sent' | 'preparing'
   tableId?: string | null
   customerName?: string | null
+  notes?: string | null
   createdAt: string
   items: KitchenItem[]
 }
@@ -209,6 +210,16 @@ export function CocinaScreen({ tenantName, primaryColor, tables, userName }: Pro
             </div>
           ))}
         </div>
+
+        {/* Order-level notes */}
+        {order.notes && (
+          <div className="rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 px-3 py-2">
+            <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wide mb-0.5">
+              Observaciones del pedido
+            </p>
+            <p className="text-sm text-amber-800 dark:text-amber-300">{order.notes}</p>
+          </div>
+        )}
 
         {/* Action */}
         {!isPreparing ? (

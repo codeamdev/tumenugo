@@ -53,8 +53,8 @@ function formatDate(iso: string) {
 
 const QUICK_RANGES = [
   { label: 'Hoy', days: 0 },
-  { label: '7 días', days: 7 },
-  { label: '30 días', days: 30 },
+  { label: 'Semana', days: 7 },
+  { label: 'Mes', days: 30 },
 ]
 
 export default function InformesPage() {
