@@ -161,7 +161,7 @@ export function POSScreen({ categories, products, tables, userId, tenantName, cu
   }
 
   function originLabel(origin: OrderOrigin) {
-    if (origin.type === 'table') return `Mesa ${origin.tableName}`
+    if (origin.type === 'table') return origin.tableName ?? 'Mesa'
     if (origin.type === 'bar') return 'Barra'
     return `Domicilio — ${origin.customerName}`
   }
