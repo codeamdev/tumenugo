@@ -164,6 +164,7 @@ export async function POST(request: NextRequest) {
         paymentMethods,
         deliveryFields,
         defaultOpeningAmount: (posConfig?.defaultOpeningAmount as number | undefined) ?? 0,
+        ...(posConfig?.kitchenAlertMinutes ? { kitchenAlertMinutes: posConfig.kitchenAlertMinutes } : {}),
       },
       accessToken,
       refreshToken,

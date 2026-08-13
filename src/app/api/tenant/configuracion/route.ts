@@ -28,6 +28,7 @@ const updateSchema = z.object({
     paymentMethods: z.array(z.object({ key: z.string().min(1), label: z.string().min(1), isCredit: z.boolean().optional() })).optional(),
     defaultOpeningAmount: z.number().min(0).optional(),
     defaultDeliveryFee: z.number().min(0).optional(),
+    kitchenAlertMinutes: z.number().int().min(1).max(60).optional(),
   }).optional(),
 })
 
