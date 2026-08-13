@@ -14,6 +14,7 @@ const updateSchema = z.object({
   taxRateId: z.string().uuid().optional().nullable(),
   prepTimeMin: z.number().int().min(0).optional(),
   isAvailable: z.boolean().optional(),
+  inStock: z.boolean().optional(),
   sortOrder: z.number().int().optional(),
   imageUrl: z.string().url().optional().nullable(),
   flavors: z.array(z.string().min(1)).optional(),

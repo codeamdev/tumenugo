@@ -15,6 +15,7 @@ const createSchema = z.object({
   taxRateId: z.string().uuid().optional(),
   prepTimeMin: z.number().int().min(0).default(0),
   isAvailable: z.boolean().default(true),
+  inStock: z.boolean().default(true),
   sortOrder: z.number().int().default(0),
   flavors: z.array(z.string().min(1)).default([]),
 })

@@ -30,6 +30,7 @@ interface ProductWithModifiers {
   taxRate: number
   taxName?: string | null
   isAvailable: boolean
+  inStock: boolean
   imageUrl?: string | null
   flavors: string[]
   modifierGroups: {
@@ -374,8 +375,8 @@ export function POSScreen({ categories, products, tables, userId, tenantName, cu
               <button
                 key={product.id}
                 onClick={() => handleProductClick(product)}
-                disabled={!product.isAvailable}
-                className="relative flex flex-col items-start rounded-xl border bg-card p-3 text-left hover:border-primary hover:shadow-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed active:scale-95"
+                disabled={!product.isAvailable || !product.inStock}
+                className="relative flex flex-col items-start rounded-xl border bg-card p-3 text-left hover:border-primary hover:shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
               >
                 {product.imageUrl && (
                   <img
@@ -388,9 +389,13 @@ export function POSScreen({ categories, products, tables, userId, tenantName, cu
                 {product.description && (
                   <span className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{product.description}</span>
                 )}
-                <span className="mt-2 font-semibold text-primary">
-                  {formatCurrency(product.price, currencySign)}
-                </span>
+                {!product.inStock ? (
+                  <span className="mt-2 text-xs font-semibold text-destructive bg-destructive/10 px-2 py-0.5 rounded-full">Agotado</span>
+                ) : (
+                  <span className="mt-2 font-semibold text-primary">
+                    {formatCurrency(product.price, currencySign)}
+                  </span>
+                )}
                 {((product.flavors?.length ?? 0) > 0 || product.modifierGroups.length > 0) && (
                   <span className="absolute top-2 right-2 h-1.5 w-1.5 rounded-full bg-primary" title="Tiene opciones" />
                 )}

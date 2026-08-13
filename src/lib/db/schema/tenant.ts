@@ -144,6 +144,7 @@ export const products = pgTable('products', {
   prepTimeMin: integer('prep_time_min').default(0),
   imageUrl: text('image_url'),
   isAvailable: boolean('is_available').notNull().default(true),
+  inStock: boolean('in_stock').notNull().default(true),
   sortOrder: integer('sort_order').notNull().default(0),
   flavors: jsonb('flavors').$type<string[]>().notNull().default([]),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
