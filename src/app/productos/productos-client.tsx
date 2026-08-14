@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/table'
 import { Search, Pencil, X } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
-import { ProductToggleAvailable } from './product-controls'
+import { ProductToggleAvailable, ProductToggleInStock } from './product-controls'
 import Link from 'next/link'
 
 interface Product {
@@ -20,6 +20,7 @@ interface Product {
   categoryId: string
   taxRateId?: string | null
   isAvailable: boolean
+  inStock: boolean
   sortOrder?: number | null
 }
 
@@ -42,12 +43,12 @@ interface Props {
   currencySign: string
 }
 
-type AvailFilter = 'all' | 'available' | 'unavailable'
+type StatusFilter = 'all' | 'available' | 'out_of_stock' | 'hidden'
 
 export function ProductosClient({ products, categories, taxRates, canEdit, currencySign }: Props) {
   const [search, setSearch] = useState('')
   const [catFilter, setCatFilter] = useState<string>('all')
-  const [availFilter, setAvailFilter] = useState<AvailFilter>('all')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
 
   const catMap = useMemo(() => Object.fromEntries(categories.map((c) => [c.id, c])), [categories])
   const taxMap = useMemo(() => Object.fromEntries(taxRates.map((t) => [t.id, t])), [taxRates])
@@ -59,18 +60,26 @@ export function ProductosClient({ products, categories, taxRates, canEdit, curre
       list = list.filter((p) => p.name.toLowerCase().includes(q) || p.description?.toLowerCase().includes(q))
     }
     if (catFilter !== 'all') list = list.filter((p) => p.categoryId === catFilter)
-    if (availFilter === 'available') list = list.filter((p) => p.isAvailable)
-    if (availFilter === 'unavailable') list = list.filter((p) => !p.isAvailable)
+    if (statusFilter === 'available') list = list.filter((p) => p.isAvailable && p.inStock)
+    if (statusFilter === 'out_of_stock') list = list.filter((p) => p.isAvailable && !p.inStock)
+    if (statusFilter === 'hidden') list = list.filter((p) => !p.isAvailable)
     return list
-  }, [products, search, catFilter, availFilter])
+  }, [products, search, catFilter, statusFilter])
 
-  const hasFilters = search.trim() || catFilter !== 'all' || availFilter !== 'all'
+  const hasFilters = search.trim() || catFilter !== 'all' || statusFilter !== 'all'
 
   function clearFilters() {
     setSearch('')
     setCatFilter('all')
-    setAvailFilter('all')
+    setStatusFilter('all')
   }
+
+  const STATUS_TABS: { value: StatusFilter; label: string }[] = [
+    { value: 'all', label: 'Todos' },
+    { value: 'available', label: 'Disponibles' },
+    { value: 'out_of_stock', label: 'Agotados' },
+    { value: 'hidden', label: 'Ocultos' },
+  ]
 
   return (
     <div className="space-y-4">
@@ -98,15 +107,15 @@ export function ProductosClient({ products, categories, taxRates, canEdit, curre
         </select>
 
         <div className="flex rounded-md border overflow-hidden text-sm">
-          {(['all', 'available', 'unavailable'] as AvailFilter[]).map((v) => (
+          {STATUS_TABS.map(({ value, label }) => (
             <button
-              key={v}
-              onClick={() => setAvailFilter(v)}
+              key={value}
+              onClick={() => setStatusFilter(value)}
               className={`px-3 py-2 transition-colors ${
-                availFilter === v ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'
+                statusFilter === value ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'
               }`}
             >
-              {v === 'all' ? 'Todos' : v === 'available' ? 'Disponibles' : 'Agotados'}
+              {label}
             </button>
           ))}
         </div>
@@ -138,7 +147,8 @@ export function ProductosClient({ products, categories, taxRates, canEdit, curre
                 <TableHead className="hidden sm:table-cell">Categoría</TableHead>
                 <TableHead>Precio</TableHead>
                 <TableHead className="hidden md:table-cell">Impuesto</TableHead>
-                <TableHead>Estado</TableHead>
+                <TableHead>Visibilidad</TableHead>
+                <TableHead>Stock</TableHead>
                 {canEdit && <TableHead className="w-16" />}
               </TableRow>
             </TableHeader>
@@ -180,7 +190,21 @@ export function ProductosClient({ products, categories, taxRates, canEdit, curre
                           : 'bg-slate-50 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
                       }`}>
                         <span className={`h-1.5 w-1.5 rounded-full ${p.isAvailable ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-                        {p.isAvailable ? 'Disponible' : 'Agotado'}
+                        {p.isAvailable ? 'Visible' : 'Oculto'}
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {canEdit ? (
+                      <ProductToggleInStock productId={p.id} inStock={p.inStock} />
+                    ) : (
+                      <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${
+                        p.inStock
+                          ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
+                          : 'bg-red-50 text-red-600 dark:bg-red-950 dark:text-red-400'
+                      }`}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${p.inStock ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                        {p.inStock ? 'En stock' : 'Agotado'}
                       </span>
                     )}
                   </TableCell>

@@ -40,6 +40,7 @@ export default async function EditarProductoPage({ params }: { params: { id: str
           taxRateId: data.product.taxRateId,
           prepTimeMin: data.product.prepTimeMin,
           isAvailable: data.product.isAvailable,
+          inStock: data.product.inStock,
           sortOrder: data.product.sortOrder ?? 0,
           flavors: data.product.flavors ?? [],
         }}

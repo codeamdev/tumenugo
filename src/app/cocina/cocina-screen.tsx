@@ -32,6 +32,7 @@ interface Props {
   primaryColor: string
   tables: { id: string; name: string }[]
   userName: string
+  kitchenAlertMinutes: number
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -75,7 +76,7 @@ function playBeep() {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function CocinaScreen({ tenantName, primaryColor, tables, userName }: Props) {
+export function CocinaScreen({ tenantName, primaryColor, tables, userName, kitchenAlertMinutes }: Props) {
   const { toast } = useToast()
   const [orders, setOrders] = useState<KitchenOrder[]>([])
   const [refreshing, setRefreshing] = useState(false)
@@ -158,18 +159,34 @@ export function CocinaScreen({ tenantName, primaryColor, tables, userName }: Pro
     const label = getOrderLabel(order, tables)
     const { label: timeLabel, urgency } = elapsedInfo(order.createdAt)
     const isPreparing = order.status === 'preparing'
+    const elapsedMin = Math.floor((Date.now() - new Date(order.createdAt).getTime()) / 60000)
+    const isLate = isPreparing && kitchenAlertMinutes > 0 && elapsedMin >= kitchenAlertMinutes
 
     const urgencyClass =
       urgency === 'urgent' ? 'text-red-600 dark:text-red-400' :
       urgency === 'warning' ? 'text-amber-600 dark:text-amber-400' :
       'text-muted-foreground'
 
-    const borderClass = isPreparing
-      ? 'border-amber-400 dark:border-amber-600'
-      : 'border-blue-400 dark:border-blue-700'
+    const borderClass = isLate
+      ? 'border-red-500 dark:border-red-600'
+      : isPreparing
+        ? 'border-amber-400 dark:border-amber-600'
+        : 'border-blue-400 dark:border-blue-700'
 
     return (
-      <div key={order.id} className={`rounded-xl border-2 bg-card p-4 flex flex-col gap-3 ${borderClass}`}>
+      <div
+        key={order.id}
+        className={`rounded-xl border-2 bg-card p-4 flex flex-col gap-3 ${borderClass} ${isLate ? 'animate-[late-blink_0.9s_ease-in-out_infinite]' : ''}`}
+      >
+        {/* Late banner */}
+        {isLate && (
+          <div className="rounded-md bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-700 px-3 py-1.5">
+            <p className="text-xs font-bold text-red-700 dark:text-red-400 uppercase tracking-wide">
+              ⚠ DEMORADO — {elapsedMin} min en preparación
+            </p>
+          </div>
+        )}
+
         {/* Header row */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">

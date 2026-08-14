@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/ui/use-toast'
 import { useRouter } from 'next/navigation'
-import { Settings, Palette, Globe, DollarSign, CheckCircle, Truck, CreditCard, LockOpen, Plus, Trash2 } from 'lucide-react'
+import { Settings, Palette, Globe, DollarSign, CheckCircle, Truck, CreditCard, LockOpen, Plus, Trash2, Bell } from 'lucide-react'
 
 interface PaymentMethodConfig {
   key: string
@@ -26,6 +26,7 @@ interface TenantConfig {
   posConfig: {
     deliveryFields: { phone: boolean; address: boolean; notes: boolean; fee: boolean }
     paymentMethods?: { key: string; label: string; isCredit?: boolean }[] | string[]
+    kitchenAlertMinutes?: number
   } | null
 }
 
@@ -90,6 +91,7 @@ export default function ConfiguracionPage() {
     paymentMethods: DEFAULT_PAYMENT_METHODS,
     defaultOpeningAmount: 0,
     defaultDeliveryFee: 0,
+    kitchenAlertMinutes: 0,
   })
 
   useEffect(() => {
@@ -113,6 +115,7 @@ export default function ConfiguracionPage() {
           paymentMethods: normalizePaymentMethods(d.posConfig?.paymentMethods),
           defaultOpeningAmount: d.posConfig?.defaultOpeningAmount ?? 0,
           defaultDeliveryFee: d.posConfig?.defaultDeliveryFee ?? 0,
+          kitchenAlertMinutes: d.posConfig?.kitchenAlertMinutes ?? 0,
         })
         setLoading(false)
       })
@@ -144,6 +147,7 @@ export default function ConfiguracionPage() {
             paymentMethods: form.paymentMethods,
             defaultOpeningAmount: form.defaultOpeningAmount,
             defaultDeliveryFee: form.defaultDeliveryFee,
+            ...(form.kitchenAlertMinutes > 0 ? { kitchenAlertMinutes: form.kitchenAlertMinutes } : {}),
           },
         }),
       })
@@ -355,6 +359,32 @@ export default function ConfiguracionPage() {
           <p className="text-xs text-muted-foreground">
             Monto de efectivo con el que se abre la caja automáticamente en el primer cobro del día.
           </p>
+        </div>
+      </Card>
+
+      {/* Kitchen alert */}
+      <Card className="p-5 space-y-4">
+        <h2 className="font-semibold flex items-center gap-2">
+          <Bell className="h-4 w-4" /> Alerta de cocina
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          Tiempo en preparación antes de que un pedido parpadee en rojo por demora.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {([0, 5, 10, 15] as const).map((min) => (
+            <button
+              key={min}
+              type="button"
+              onClick={() => setForm((f) => ({ ...f, kitchenAlertMinutes: min }))}
+              className={`inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-semibold border-2 transition-all ${
+                form.kitchenAlertMinutes === min
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-slate-200 bg-slate-50 text-slate-500 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400'
+              }`}
+            >
+              {min === 0 ? 'Desactivada' : `${min} min`}
+            </button>
+          ))}
         </div>
       </Card>
 

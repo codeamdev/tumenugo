@@ -19,12 +19,15 @@ export default async function CocinaPage() {
     return { tables: mesas, userName: currentUser?.name ?? 'Cocina' }
   })
 
+  const posConfig = tenant.posConfig as { kitchenAlertMinutes?: number } | null
+
   return (
     <CocinaScreen
       tenantName={tenant.name}
       primaryColor={tenant.primaryColor ?? '#2563eb'}
       tables={data.tables}
       userName={data.userName}
+      kitchenAlertMinutes={posConfig?.kitchenAlertMinutes ?? 0}
     />
   )
 }

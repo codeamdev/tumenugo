@@ -25,6 +25,7 @@ interface Props {
     taxRateId?: string | null
     prepTimeMin?: number | null
     isAvailable?: boolean
+    inStock?: boolean
     sortOrder?: number
     flavors?: string[] | null
   }
@@ -45,6 +46,7 @@ export function ProductForm({ categories, taxRates, initial }: Props) {
     taxRateId: initial?.taxRateId ?? '__none__',
     prepTimeMin: initial?.prepTimeMin ?? 0,
     isAvailable: initial?.isAvailable ?? true,
+    inStock: initial?.inStock ?? true,
     sortOrder: initial?.sortOrder ?? 0,
     flavors: (initial?.flavors ?? []) as string[],
   })
@@ -197,7 +199,8 @@ export function ProductForm({ categories, taxRates, initial }: Props) {
             </div>
           </div>
           <div className="space-y-1.5">
-            <Label>Estado</Label>
+            <Label>Visibilidad en POS</Label>
+            <p className="text-xs text-muted-foreground">Desactivar oculta el producto del catálogo</p>
             <button
               type="button"
               onClick={() => setForm((f) => ({ ...f, isAvailable: !f.isAvailable }))}
@@ -208,7 +211,23 @@ export function ProductForm({ categories, taxRates, initial }: Props) {
               }`}
             >
               <span className={`h-2 w-2 rounded-full ${form.isAvailable ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-              {form.isAvailable ? 'Disponible para venta' : 'No disponible'}
+              {form.isAvailable ? 'Visible en POS' : 'Oculto del POS'}
+            </button>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Stock</Label>
+            <p className="text-xs text-muted-foreground">Desactivar muestra "Agotado" sin ocultar el producto</p>
+            <button
+              type="button"
+              onClick={() => setForm((f) => ({ ...f, inStock: !f.inStock }))}
+              className={`inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-semibold border-2 transition-all ${
+                form.inStock
+                  ? 'border-emerald-400 bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-700'
+                  : 'border-red-300 bg-red-50 text-red-600 dark:bg-red-950 dark:text-red-400 dark:border-red-700'
+              }`}
+            >
+              <span className={`h-2 w-2 rounded-full ${form.inStock ? 'bg-emerald-500' : 'bg-red-500'}`} />
+              {form.inStock ? 'En stock' : 'Agotado'}
             </button>
           </div>
         </CardContent>
