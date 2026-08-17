@@ -2,21 +2,25 @@
 
 import { useState } from 'react'
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select'
-import { Switch } from '@/components/ui/switch'
-import { AlertCircle } from 'lucide-react'
+import { AlertCircle, Plus, Trash2 } from 'lucide-react'
 import { formatCurrency, round2 } from '@/lib/utils'
 import type { PaymentMethodConfig } from '@/lib/payment-methods'
 import type { ActiveOrder } from './pos-store'
 import type { OrderTotals as Totals } from '@/lib/order-calc'
+
+interface PaymentLine { method: string; amount: string }
+
+export interface ClosePaymentData {
+  payments: { method: string; amount: number }[]
+  customerName?: string
+  paymentNotes?: string
+}
 
 interface Props {
   order: ActiveOrder
@@ -24,63 +28,69 @@ interface Props {
   currencySign: string
   paymentMethods: PaymentMethodConfig[]
   onClose: () => void
-  onConfirm: (paymentData: {
-    paymentMethod: string
-    paymentNotes?: string
-    customerName?: string
-    cashReceived?: number
-    tipAmount: number
-  }) => Promise<void>
+  onConfirm: (paymentData: ClosePaymentData) => Promise<void>
 }
 
-export function CloseOrderModal({ order, totals, currencySign, paymentMethods, onClose, onConfirm }: Props) {
+const QUICK_AMOUNTS = [10_000, 20_000, 50_000, 100_000]
+
+export function CloseOrderModal({ order: _order, totals, currencySign, paymentMethods, onClose, onConfirm }: Props) {
   const defaultMethod = paymentMethods[0]?.key ?? 'cash'
-  const [paymentMethod, setPaymentMethod] = useState(defaultMethod)
-  const [paymentNotes, setPaymentNotes] = useState('')
+  const [lines, setLines] = useState<PaymentLine[]>([{ method: defaultMethod, amount: '' }])
   const [customerName, setCustomerName] = useState('')
-  const [cashReceived, setCashReceived] = useState('')
-  const [addTip, setAddTip] = useState(false)
-  const [tipPercent, setTipPercent] = useState(10)
+  const [paymentNotes, setPaymentNotes] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const selectedMethod = paymentMethods.find((m) => m.key === paymentMethod)
-  const isCredit = selectedMethod?.isCredit ?? false
+  const grandTotal = totals.total
   const fmt = (n: number) => formatCurrency(n, currencySign)
 
-  const tip = (!isCredit && addTip) ? round2(totals.subtotal * (tipPercent / 100)) : 0
-  const finalTotal = round2(totals.total + tip - totals.tip)
+  const totalPaid = lines.reduce((s, l) => s + (parseFloat(l.amount) || 0), 0)
+  const remaining = round2(grandTotal - totalPaid)
 
-  const change = paymentMethod === 'cash' && cashReceived
-    ? round2(parseFloat(cashReceived) - finalTotal)
-    : null
+  const firstMethod = paymentMethods.find((m) => m.key === lines[0]?.method)
+  const isCredit = firstMethod?.isCredit ?? false
+
+  function updateLine(idx: number, field: keyof PaymentLine, value: string) {
+    setLines((prev) => prev.map((l, i) => i === idx ? { ...l, [field]: value } : l))
+  }
+
+  function addLine() {
+    setLines((prev) => [...prev, { method: defaultMethod, amount: remaining > 0 ? String(remaining) : '' }])
+  }
+
+  function removeLine(idx: number) {
+    setLines((prev) => prev.filter((_, i) => i !== idx))
+  }
 
   const isValid =
-    (paymentMethod !== 'cash' || !cashReceived || parseFloat(cashReceived) >= finalTotal) &&
-    (!isCredit || (customerName.trim().length > 0 && paymentNotes.trim().length > 0))
+    lines.some((l) => parseFloat(l.amount) > 0) &&
+    remaining <= 0.01 &&
+    (!isCredit || customerName.trim().length > 0) &&
+    (!isCredit || paymentNotes.trim().length > 0)
 
   async function handleConfirm() {
     setLoading(true)
+    const validPayments = lines
+      .map((l) => ({ method: l.method, amount: parseFloat(l.amount) || 0 }))
+      .filter((l) => l.amount > 0)
     await onConfirm({
-      paymentMethod,
-      paymentNotes: paymentNotes.trim() || undefined,
+      payments: validPayments,
       customerName: isCredit ? customerName.trim() : undefined,
-      cashReceived: paymentMethod === 'cash' && cashReceived ? parseFloat(cashReceived) : undefined,
-      tipAmount: tip,
+      paymentNotes: isCredit ? paymentNotes.trim() : undefined,
     })
     setLoading(false)
   }
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {isCredit ? `Registrar ${selectedMethod?.label ?? 'pago pendiente'}` : 'Cerrar pedido y cobrar'}
+            {isCredit ? `Registrar ${firstMethod?.label ?? 'pago pendiente'}` : 'Cobrar pedido'}
           </DialogTitle>
         </DialogHeader>
 
         {/* Resumen */}
-        <div className="rounded-lg border p-4 space-y-2 text-sm bg-muted/30">
+        <div className="rounded-lg border p-3 space-y-1.5 text-sm bg-muted/30">
           <div className="flex justify-between text-muted-foreground">
             <span>Subtotal</span><span>{fmt(totals.subtotal)}</span>
           </div>
@@ -94,96 +104,119 @@ export function CloseOrderModal({ order, totals, currencySign, paymentMethods, o
               <span>Domicilio</span><span>{fmt(totals.deliveryFee)}</span>
             </div>
           )}
-          {tip > 0 && (
-            <div className="flex justify-between text-emerald-600">
-              <span>Propina ({tipPercent}%)</span><span>{fmt(tip)}</span>
-            </div>
-          )}
           <Separator />
-          <div className="flex justify-between font-bold text-lg">
-            <span>Total</span><span>{fmt(finalTotal)}</span>
+          <div className="flex justify-between font-bold text-base">
+            <span>Total</span><span>{fmt(grandTotal)}</span>
           </div>
         </div>
 
-        {/* Propina (no aplica para fiado) */}
-        {!isCredit && (
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Switch checked={addTip} onCheckedChange={setAddTip} />
-              <Label>Propina</Label>
-            </div>
-            {addTip && (
-              <div className="flex gap-1">
-                {[5, 10, 15].map((pct) => (
+        {/* Pagos */}
+        <div className="space-y-2">
+          <Label>Pagos recibidos</Label>
+          {lines.map((line, idx) => (
+            <div key={idx} className="rounded-lg border p-2.5 space-y-2 bg-muted/20">
+              {/* Chips de método */}
+              <div className="flex flex-wrap gap-1.5">
+                {paymentMethods.map((m) => (
                   <button
-                    key={pct}
-                    onClick={() => setTipPercent(pct)}
-                    className={`rounded px-2 py-1 text-xs font-medium border transition-colors ${
-                      tipPercent === pct ? 'bg-primary text-primary-foreground border-primary' : 'hover:bg-muted'
+                    key={m.key}
+                    type="button"
+                    onClick={() => updateLine(idx, 'method', m.key)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                      line.method === m.key
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'bg-background border-border text-muted-foreground hover:bg-muted'
                     }`}
                   >
-                    {pct}%
+                    {m.label}
+                    {m.isCredit && <span className="ml-1 text-[10px] opacity-70">(crédito)</span>}
                   </button>
                 ))}
               </div>
+              {/* Monto */}
+              <div className="flex gap-2 items-center">
+                <Input
+                  type="number"
+                  min="0"
+                  step="1000"
+                  placeholder={idx === 0 ? fmt(grandTotal) : '0'}
+                  value={line.amount}
+                  onChange={(e) => updateLine(idx, 'amount', e.target.value)}
+                  className="flex-1"
+                />
+                {lines.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeLine(idx)}
+                    className="p-2 text-muted-foreground hover:text-destructive transition-colors shrink-0"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={addLine}
+            className="flex items-center gap-1.5 text-sm text-primary hover:underline"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Agregar otra forma de pago
+          </button>
+        </div>
+
+        {/* Montos rápidos */}
+        <div className="space-y-1.5">
+          <Label>Monto rápido</Label>
+          <div className="flex flex-wrap gap-2">
+            {QUICK_AMOUNTS.map((amt) => (
+              <button
+                key={amt}
+                type="button"
+                onClick={() => updateLine(0, 'amount', String(amt))}
+                className="px-3 py-1.5 rounded-lg text-xs font-bold border border-primary text-primary hover:bg-primary/10 transition-colors"
+              >
+                +{amt >= 1000 ? `${amt / 1000}k` : amt}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => updateLine(0, 'amount', String(grandTotal))}
+              className="px-3 py-1.5 rounded-lg text-xs font-bold border border-primary text-primary bg-primary/10 hover:bg-primary/20 transition-colors"
+            >
+              Exacto
+            </button>
+          </div>
+        </div>
+
+        {/* Balance */}
+        {totalPaid > 0 && (
+          <div className={`rounded-lg border p-3 flex justify-between items-center text-sm ${
+            remaining <= 0
+              ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-800'
+              : 'bg-destructive/10 border-destructive/30'
+          }`}>
+            <span className="font-medium text-foreground">
+              {remaining < -0.01 ? 'Cambio a devolver' : remaining > 0.01 ? 'Falta por cubrir' : 'Cuadra exacto ✓'}
+            </span>
+            {Math.abs(remaining) > 0.01 && (
+              <span className="font-bold text-base">{fmt(Math.abs(remaining))}</span>
             )}
           </div>
         )}
 
-        {/* Método de pago */}
-        <div className="space-y-2">
-          <Label>Método de pago</Label>
-          <Select value={paymentMethod} onValueChange={(v) => { setPaymentMethod(v); setCustomerName(''); setPaymentNotes(''); setCashReceived('') }}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {paymentMethods.map((m) => (
-                <SelectItem key={m.key} value={m.key}>
-                  {m.label}
-                  {m.isCredit && (
-                    <span className="ml-2 text-xs text-amber-600 font-medium">(crédito)</span>
-                  )}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
         {/* Aviso fiado */}
         {isCredit && (
-          <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/30 p-3 text-sm text-amber-800 dark:text-amber-200">
             <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
             <span>El pedido quedará cerrado pero <strong>sin cobrar</strong>. Aparecerá en el informe de cuentas por cobrar.</span>
           </div>
         )}
 
-        {/* Efectivo */}
-        {paymentMethod === 'cash' && (
-          <div className="space-y-2">
-            <Label>Valor recibido ($)</Label>
-            <Input
-              type="number"
-              min={finalTotal}
-              step="1000"
-              value={cashReceived}
-              onChange={(e) => setCashReceived(e.target.value)}
-              placeholder={fmt(finalTotal)}
-            />
-            {change !== null && change >= 0 && (
-              <p className="text-sm font-medium text-emerald-600">Vuelto: {fmt(change)}</p>
-            )}
-            {change !== null && change < 0 && (
-              <p className="text-sm font-medium text-destructive">
-                Monto insuficiente ({fmt(Math.abs(change))} menos)
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Nombre del cliente — obligatorio para fiado */}
+        {/* Nombre — obligatorio para crédito */}
         {isCredit && (
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <Label>
               Nombre del cliente <span className="text-destructive">*</span>
             </Label>
@@ -193,40 +226,35 @@ export function CloseOrderModal({ order, totals, currencySign, paymentMethods, o
               placeholder="Nombre completo de quien debe"
               autoFocus
             />
-            {customerName.trim().length === 0 && (
-              <p className="text-xs text-destructive">Requerido para pagos pendientes</p>
-            )}
           </div>
         )}
 
-        {/* Observación — obligatoria para fiado, opcional para otros */}
-        <div className="space-y-2">
-          <Label>
-            Observación del pago
-            {isCredit ? <span className="text-destructive"> *</span> : <span className="text-muted-foreground text-xs"> (opcional)</span>}
-          </Label>
-          <Input
-            value={paymentNotes}
-            onChange={(e) => setPaymentNotes(e.target.value)}
-            placeholder={isCredit ? 'Motivo, plazo de pago, referencia...' : 'Número de referencia, etc.'}
-          />
-          {isCredit && paymentNotes.trim().length === 0 && (
-            <p className="text-xs text-destructive">Requerido para pagos pendientes</p>
-          )}
-        </div>
+        {/* Observaciones — obligatorio para crédito */}
+        {isCredit && (
+          <div className="space-y-1.5">
+            <Label>
+              Observaciones <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              value={paymentNotes}
+              onChange={(e) => setPaymentNotes(e.target.value)}
+              placeholder="Motivo, plazo de pago, referencia..."
+            />
+          </div>
+        )}
 
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+        <div className="flex gap-3 pt-1">
+          <Button variant="outline" onClick={onClose} className="flex-1">Cancelar</Button>
           <Button
             onClick={handleConfirm}
             disabled={!isValid || loading}
             loading={loading}
             variant={isCredit ? 'outline' : 'default'}
-            className={isCredit ? 'border-amber-400 text-amber-700 hover:bg-amber-50' : ''}
+            className={`flex-1 ${isCredit ? 'border-amber-400 text-amber-700 hover:bg-amber-50' : ''}`}
           >
             {isCredit ? 'Registrar deuda' : 'Confirmar cobro'}
           </Button>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   )

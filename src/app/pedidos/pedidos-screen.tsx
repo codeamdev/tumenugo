@@ -1704,6 +1704,30 @@ export function PedidosScreen({
             </button>
           </div>
 
+          {/* Montos rápidos */}
+          <div className="space-y-1.5">
+            <Label>Monto rápido</Label>
+            <div className="flex flex-wrap gap-2">
+              {[10000, 20000, 50000, 100000].map((amt) => (
+                <button
+                  key={amt}
+                  type="button"
+                  onClick={() => setPayLines((ls) => ls.map((l, i) => i === 0 ? { ...l, amount: String(amt) } : l))}
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold border border-primary text-primary hover:bg-primary/10 transition-colors"
+                >
+                  +{amt >= 1000 ? `${amt / 1000}k` : amt}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => setPayLines((ls) => ls.map((l, i) => i === 0 ? { ...l, amount: String(payTotal) } : l))}
+                className="px-3 py-1.5 rounded-lg text-xs font-bold border border-primary text-primary bg-primary/10 hover:bg-primary/20 transition-colors"
+              >
+                Exacto
+              </button>
+            </div>
+          </div>
+
           {/* Balance indicator */}
           <div className="rounded-lg border p-3 space-y-1 text-sm">
             <div className="flex justify-between">
