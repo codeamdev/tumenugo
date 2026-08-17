@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useState } from 'react'
 import {
   ShoppingCart, UtensilsCrossed, Archive,
-  BarChart3, Settings, Wallet, Menu, Users, ChefHat, ShoppingBag,
+  BarChart3, Settings, Wallet, Menu, Users, ChefHat,
 } from 'lucide-react'
 import { ROLE_LABELS } from '@/types'
 import { LogoutButton } from './logout-button'
@@ -30,7 +30,6 @@ export function TenantSidebar({ tenantName, primaryColor, role }: Props) {
         { href: '/cocina', icon: ChefHat, label: 'Cocina' },
         { href: '/mesas', icon: UtensilsCrossed, label: 'Mesas' },
         { href: '/productos', icon: Archive, label: 'Productos' },
-        { href: '/compras', icon: ShoppingBag, label: 'Compras' },
         { href: '/caja', icon: Wallet, label: 'Caja' },
         ...(role === 'admin'
           ? [

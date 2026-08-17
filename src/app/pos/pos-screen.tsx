@@ -77,13 +77,8 @@ export function POSScreen({ categories, products, tables, userId, tenantName, cu
   const [showNewOrderModal, setShowNewOrderModal] = useState(false)
   const [showCloseModal, setShowCloseModal] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [mobileTab, setMobileTab] = useState<'orders' | 'catalog' | 'cart'>('catalog')
+  const [mobileTab, setMobileTab] = useState<'catalog' | 'cart'>('catalog')
   const [tablesPanelOpen, setTablesPanelOpen] = useState(false)
-
-  function quickSelectOrder(localId: string) {
-    store.setActiveOrder(localId)
-    setMobileTab('cart')
-  }
 
   function quickCreateBar() {
     store.newOrder({ type: 'bar' })
@@ -95,7 +90,8 @@ export function POSScreen({ categories, products, tables, userId, tenantName, cu
       (o) => o.origin.type === 'table' && o.origin.tableId === table.id
     )
     if (existing) {
-      quickSelectOrder(existing.localId)
+      store.setActiveOrder(existing.localId)
+      setMobileTab('cart')
     } else {
       store.newOrder({ type: 'table', tableId: table.id, tableName: table.name })
       setMobileTab('cart')
@@ -247,101 +243,65 @@ export function POSScreen({ categories, products, tables, userId, tenantName, cu
   return (
     <div className="flex flex-col h-screen overflow-hidden">
     <div className="flex flex-1 overflow-hidden">
-      {/* ── LEFT: Order list ──────────────────────────────────────────────── */}
-      <div className={`border-r bg-muted/20 flex-col overflow-hidden shrink-0 w-full md:w-52 ${mobileTab === 'orders' ? 'flex' : 'hidden md:flex'}`}>
-        {/* Quick actions */}
-        <div className="p-3 border-b space-y-2">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Pedidos</p>
-            <OfflineIndicator />
-          </div>
-          <div className={`grid gap-1.5 ${barEnabled ? 'grid-cols-3' : 'grid-cols-2'}`}>
-            {barEnabled && (
-              <button
-                onClick={quickCreateBar}
-                className="flex flex-col items-center gap-1 rounded-lg border bg-background p-2 text-xs font-medium hover:border-primary hover:bg-primary/5 transition-colors"
-              >
-                <BarChart3 className="h-4 w-4" />
-                Barra
-              </button>
-            )}
-            <button
-              onClick={() => setTablesPanelOpen((v) => !v)}
-              className={`flex flex-col items-center gap-1 rounded-lg border p-2 text-xs font-medium transition-colors ${tablesPanelOpen ? 'border-primary bg-primary text-primary-foreground' : 'bg-background hover:border-primary hover:bg-primary/5'}`}
-            >
-              <UtensilsCrossed className="h-4 w-4" />
-              Mesa
-            </button>
-            <button
-              onClick={() => setShowNewOrderModal(true)}
-              className="flex flex-col items-center gap-1 rounded-lg border bg-background p-2 text-xs font-medium hover:border-primary hover:bg-primary/5 transition-colors"
-            >
-              <Truck className="h-4 w-4" />
-              Domicilio
-            </button>
-          </div>
-          {/* Tables picker */}
-          {tablesPanelOpen && tables.length > 0 && (
-            <div className="rounded-lg border bg-background p-2 space-y-1.5">
-              {Array.from(new Set(tables.map((t) => t.zone))).map((zone) => (
-                <div key={zone}>
-                  <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-1">{zone}</p>
-                  <div className="grid grid-cols-3 gap-1">
-                    {tables.filter((t) => t.zone === zone).map((table) => {
-                      const hasOrder = store.orders.some(
-                        (o) => o.origin.type === 'table' && o.origin.tableId === table.id
-                      )
-                      return (
-                        <button
-                          key={table.id}
-                          onClick={() => quickCreateOrSelectTable(table)}
-                          className={`rounded-md border py-1.5 text-xs font-medium transition-colors ${
-                            hasOrder
-                              ? 'border-primary bg-primary text-primary-foreground'
-                              : table.status === 'occupied'
-                              ? 'border-red-200 bg-red-50 text-red-600'
-                              : 'hover:border-primary hover:bg-primary/5'
-                          }`}
-                        >
-                          {table.name}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-        {/* Active orders */}
-        <div className="flex-1 overflow-y-auto p-2 space-y-1">
-          {store.orders.map((order) => (
-            <button
-              key={order.localId}
-              onClick={() => quickSelectOrder(order.localId)}
-              className={`w-full text-left rounded-md p-2 text-xs transition-colors ${
-                store.activeOrderId === order.localId
-                  ? 'bg-primary text-primary-foreground'
-                  : 'hover:bg-muted'
-              }`}
-            >
-              <div className="flex items-center gap-1.5">
-                {originIcon(order.origin)}
-                <span className="font-medium truncate">{originLabel(order.origin)}</span>
-              </div>
-              <span className="opacity-75">{order.items.length} ítem(s)</span>
-            </button>
-          ))}
-          {store.orders.length === 0 && (
-            <p className="text-xs text-muted-foreground text-center py-4">
-              Sin pedidos activos
-            </p>
-          )}
-        </div>
-      </div>
 
-      {/* ── CENTER: Product catalog ───────────────────────────────────────── */}
+      {/* ── LEFT: Product catalog ────────────────────────────────────────── */}
       <div className={`flex-col overflow-hidden flex-1 ${mobileTab === 'catalog' ? 'flex' : 'hidden md:flex'}`}>
+        {/* Order type selector */}
+        <div className="border-b p-2 flex items-center gap-1.5">
+          {barEnabled && (
+            <button
+              onClick={quickCreateBar}
+              className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${activeOrder?.origin.type === 'bar' ? 'border-primary bg-primary text-primary-foreground' : 'bg-background hover:border-primary hover:bg-primary/5'}`}
+            >
+              <BarChart3 className="h-3.5 w-3.5" />
+              Barra
+            </button>
+          )}
+          <button
+            onClick={() => setTablesPanelOpen((v) => !v)}
+            className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${tablesPanelOpen || activeOrder?.origin.type === 'table' ? 'border-primary bg-primary text-primary-foreground' : 'bg-background hover:border-primary hover:bg-primary/5'}`}
+          >
+            <UtensilsCrossed className="h-3.5 w-3.5" />
+            Mesa
+          </button>
+          <button
+            onClick={() => setShowNewOrderModal(true)}
+            className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${activeOrder?.origin.type === 'delivery' ? 'border-primary bg-primary text-primary-foreground' : 'bg-background hover:border-primary hover:bg-primary/5'}`}
+          >
+            <Truck className="h-3.5 w-3.5" />
+            Domicilio
+          </button>
+          <div className="flex-1" />
+          <OfflineIndicator />
+        </div>
+
+        {/* Tables picker (inline) */}
+        {tablesPanelOpen && tables.length > 0 && (
+          <div className="border-b p-3 bg-muted/30 space-y-2">
+            {Array.from(new Set(tables.map((t) => t.zone))).map((zone) => (
+              <div key={zone}>
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-1.5">{zone}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {tables.filter((t) => t.zone === zone).map((table) => (
+                    <button
+                      key={table.id}
+                      onClick={() => quickCreateOrSelectTable(table)}
+                      className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                        activeOrder?.origin.type === 'table' && activeOrder.origin.tableId === table.id
+                          ? 'border-primary bg-primary text-primary-foreground'
+                          : table.status === 'occupied'
+                          ? 'border-red-200 bg-red-50 text-red-600 dark:bg-red-950 dark:border-red-800 dark:text-red-400'
+                          : 'bg-background hover:border-primary hover:bg-primary/5'
+                      }`}
+                    >
+                      {table.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
         {/* Search */}
         <div className="border-b p-3">
           <div className="relative">
@@ -558,37 +518,9 @@ export function POSScreen({ categories, products, tables, userId, tenantName, cu
             </div>
           </>
         ) : (
-          <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-6 gap-4">
+          <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-6 gap-3">
             <ShoppingCart className="h-12 w-12" />
-            <div className="text-center">
-              <p className="font-medium">Sin pedido activo</p>
-              <p className="text-sm mt-1">Selecciona un pedido o crea uno nuevo</p>
-            </div>
-            <div className={`grid gap-2 w-full max-w-xs ${barEnabled ? 'grid-cols-3' : 'grid-cols-2'}`}>
-              {barEnabled && (
-                <button
-                  onClick={quickCreateBar}
-                  className="flex flex-col items-center gap-1.5 rounded-xl border bg-background p-3 text-sm font-medium hover:border-primary hover:bg-primary/5 transition-colors"
-                >
-                  <BarChart3 className="h-5 w-5" />
-                  Barra
-                </button>
-              )}
-              <button
-                onClick={() => { setMobileTab('orders'); setTablesPanelOpen(true) }}
-                className="flex flex-col items-center gap-1.5 rounded-xl border bg-background p-3 text-sm font-medium hover:border-primary hover:bg-primary/5 transition-colors"
-              >
-                <UtensilsCrossed className="h-5 w-5" />
-                Mesa
-              </button>
-              <button
-                onClick={() => setShowNewOrderModal(true)}
-                className="flex flex-col items-center gap-1.5 rounded-xl border bg-background p-3 text-sm font-medium hover:border-primary hover:bg-primary/5 transition-colors"
-              >
-                <Truck className="h-5 w-5" />
-                Domicilio
-              </button>
-            </div>
+            <p className="text-sm text-center">Selecciona Mesa, Barra o Domicilio para comenzar un pedido</p>
           </div>
         )}
       </div>
@@ -706,7 +638,6 @@ export function POSScreen({ categories, products, tables, userId, tenantName, cu
     {/* ── Mobile bottom tab bar ────────────────────────────────────────── */}
     <nav className="md:hidden flex border-t bg-background shrink-0">
       {([
-        { id: 'orders', label: 'Pedidos', icon: UtensilsCrossed, badge: store.orders.length },
         { id: 'catalog', label: 'Catálogo', icon: Search, badge: 0 },
         { id: 'cart', label: 'Carrito', icon: ShoppingCart, badge: activeOrder?.items.length ?? 0 },
       ] as const).map(({ id, label, icon: Icon, badge }) => (

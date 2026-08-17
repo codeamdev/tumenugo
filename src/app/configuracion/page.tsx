@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/ui/use-toast'
 import { useRouter } from 'next/navigation'
-import { Settings, Palette, Globe, DollarSign, CheckCircle, Truck, CreditCard, LockOpen, Plus, Trash2, Bell, GlassWater } from 'lucide-react'
+import { Settings, CheckCircle, Truck, CreditCard, DollarSign, LockOpen, Plus, Trash2, Bell, GlassWater } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 
 interface PaymentMethodConfig {
@@ -19,11 +19,7 @@ interface PaymentMethodConfig {
 
 interface TenantConfig {
   id: string
-  name: string
-  primaryColor: string | null
-  timezone: string | null
   currencySign: string | null
-  taxConfig: { defaultRate: number; includesIVA: boolean; includesINC: boolean } | null
   posConfig: {
     deliveryFields: { phone: boolean; address: boolean; notes: boolean; fee: boolean }
     paymentMethods?: { key: string; label: string; isCredit?: boolean }[] | string[]
@@ -57,19 +53,6 @@ function normalizePaymentMethods(raw: unknown): PaymentMethodConfig[] {
   }))
 }
 
-const TIMEZONES = [
-  'America/Bogota',
-  'America/Lima',
-  'America/Mexico_City',
-  'America/Santiago',
-  'America/Argentina/Buenos_Aires',
-  'America/Caracas',
-]
-
-const PRESET_COLORS = [
-  '#1F3D30', '#C6E06A', '#2563eb', '#16a34a',
-  '#dc2626', '#9333ea', '#ea580c', '#0891b2',
-]
 
 export default function ConfiguracionPage() {
   const { toast } = useToast()
@@ -79,13 +62,7 @@ export default function ConfiguracionPage() {
   const [saving, setSaving] = useState(false)
   const [config, setConfig] = useState<TenantConfig | null>(null)
   const [form, setForm] = useState({
-    name: '',
-    primaryColor: '#2563eb',
-    timezone: 'America/Bogota',
     currencySign: '$',
-    taxDefaultRate: 19,
-    includesIVA: true,
-    includesINC: false,
     deliveryPhone: true,
     deliveryAddress: true,
     deliveryNotes: true,
@@ -104,13 +81,7 @@ export default function ConfiguracionPage() {
         const d = json.data
         setConfig(d)
         setForm({
-          name: d.name ?? '',
-          primaryColor: d.primaryColor ?? '#2563eb',
-          timezone: d.timezone ?? 'America/Bogota',
           currencySign: d.currencySign ?? '$',
-          taxDefaultRate: d.taxConfig?.defaultRate ?? 19,
-          includesIVA: d.taxConfig?.includesIVA ?? true,
-          includesINC: d.taxConfig?.includesINC ?? false,
           deliveryPhone: d.posConfig?.deliveryFields?.phone ?? true,
           deliveryAddress: d.posConfig?.deliveryFields?.address ?? true,
           deliveryNotes: d.posConfig?.deliveryFields?.notes ?? true,
@@ -132,15 +103,7 @@ export default function ConfiguracionPage() {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: form.name,
-          primaryColor: form.primaryColor,
-          timezone: form.timezone,
           currencySign: form.currencySign,
-          taxConfig: {
-            defaultRate: form.taxDefaultRate,
-            includesIVA: form.includesIVA,
-            includesINC: form.includesINC,
-          },
           posConfig: {
             deliveryFields: {
               phone: form.deliveryPhone,
@@ -183,120 +146,19 @@ export default function ConfiguracionPage() {
         <h1 className="text-2xl font-bold">Configuración</h1>
       </div>
 
-      {/* General */}
+      {/* Currency */}
       <Card className="p-5 space-y-4">
         <h2 className="font-semibold flex items-center gap-2">
-          <Globe className="h-4 w-4" /> General
+          <DollarSign className="h-4 w-4" /> Moneda
         </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Nombre del negocio</Label>
-            <Input
-              value={form.name}
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              placeholder="Mi Cafetería"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Zona horaria</Label>
-            <select
-              value={form.timezone}
-              onChange={(e) => setForm((f) => ({ ...f, timezone: e.target.value }))}
-              className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-            >
-              {TIMEZONES.map((tz) => (
-                <option key={tz} value={tz}>{tz}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </Card>
-
-      {/* Branding */}
-      <Card className="p-5 space-y-4">
-        <h2 className="font-semibold flex items-center gap-2">
-          <Palette className="h-4 w-4" /> Marca y color
-        </h2>
-        <div className="space-y-3">
-          <Label>Color principal</Label>
-          <div className="flex flex-wrap gap-2">
-            {PRESET_COLORS.map((color) => (
-              <button
-                key={color}
-                onClick={() => setForm((f) => ({ ...f, primaryColor: color }))}
-                className="h-8 w-8 rounded-full border-2 transition-all"
-                style={{
-                  backgroundColor: color,
-                  borderColor: form.primaryColor === color ? '#000' : 'transparent',
-                  transform: form.primaryColor === color ? 'scale(1.15)' : 'scale(1)',
-                }}
-                aria-label={color}
-              />
-            ))}
-            <div className="flex items-center gap-2">
-              <input
-                type="color"
-                value={form.primaryColor}
-                onChange={(e) => setForm((f) => ({ ...f, primaryColor: e.target.value }))}
-                className="h-8 w-8 rounded cursor-pointer border"
-                title="Color personalizado"
-              />
-              <span className="text-sm text-muted-foreground font-mono">{form.primaryColor}</span>
-            </div>
-          </div>
-          <div
-            className="h-2 rounded-full transition-colors"
-            style={{ backgroundColor: form.primaryColor }}
+        <div className="space-y-2 max-w-xs">
+          <Label>Signo de moneda</Label>
+          <Input
+            value={form.currencySign}
+            onChange={(e) => setForm((f) => ({ ...f, currencySign: e.target.value }))}
+            maxLength={5}
+            placeholder="$"
           />
-        </div>
-      </Card>
-
-      {/* Currency & Taxes */}
-      <Card className="p-5 space-y-4">
-        <h2 className="font-semibold flex items-center gap-2">
-          <DollarSign className="h-4 w-4" /> Moneda e impuestos
-        </h2>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Signo de moneda</Label>
-            <Input
-              value={form.currencySign}
-              onChange={(e) => setForm((f) => ({ ...f, currencySign: e.target.value }))}
-              maxLength={5}
-              placeholder="$"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Tasa de impuesto por defecto (%)</Label>
-            <Input
-              type="number"
-              min={0}
-              max={100}
-              step={1}
-              value={form.taxDefaultRate}
-              onChange={(e) => setForm((f) => ({ ...f, taxDefaultRate: Number(e.target.value) }))}
-            />
-          </div>
-        </div>
-        <div className="flex gap-6">
-          <label className="flex items-center gap-2 text-sm cursor-pointer">
-            <input
-              type="checkbox"
-              checked={form.includesIVA}
-              onChange={(e) => setForm((f) => ({ ...f, includesIVA: e.target.checked }))}
-              className="rounded"
-            />
-            IVA (19%)
-          </label>
-          <label className="flex items-center gap-2 text-sm cursor-pointer">
-            <input
-              type="checkbox"
-              checked={form.includesINC}
-              onChange={(e) => setForm((f) => ({ ...f, includesINC: e.target.checked }))}
-              className="rounded"
-            />
-            INC (8%)
-          </label>
         </div>
       </Card>
 

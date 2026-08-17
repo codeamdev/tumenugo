@@ -1,25 +1,22 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { calcOrderTotals } from '@/lib/order-calc'
 import { formatCurrency } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/components/ui/use-toast'
 import { ModifiersModal } from '@/app/pos/modifiers-modal'
 import {
-  Plus, Minus, Trash2, Search, UtensilsCrossed, Truck, BarChart3,
-  ChevronLeft, RefreshCw, LogOut, Clock, CheckCircle2,
+  Plus, Trash2, Search, UtensilsCrossed, Truck, BarChart3,
+  ChevronLeft, RefreshCw, LogOut, Clock, CheckCircle2, Minus,
 } from 'lucide-react'
-import type { CalcItem } from '@/lib/order-calc'
 import type { PaymentMethodConfig } from '@/lib/payment-methods'
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface ProductWithModifiers {
   id: string
@@ -64,11 +61,6 @@ interface Props {
   paymentMethods: PaymentMethodConfig[]
 }
 
-type OrderOrigin =
-  | { type: 'table'; tableId: string; tableName: string }
-  | { type: 'bar' }
-  | { type: 'delivery'; customerName: string; customerPhone: string; customerAddress: string; customerNotes: string; deliveryFee: number }
-
 interface LocalItem {
   id: string
   productId: string | null
@@ -77,11 +69,6 @@ interface LocalItem {
   quantity: number
   modifiers: { groupName: string; modifierName: string; priceDelta: number }[]
   notes: string
-}
-
-interface LocalOrder {
-  origin: OrderOrigin
-  items: LocalItem[]
 }
 
 interface DBOrderItem {
@@ -113,16 +100,15 @@ interface DBOrder {
   items?: DBOrderItem[]
 }
 
-type View = 'list' | 'editing' | 'detail'
-type OriginStep = 'main' | 'delivery'
+type View = 'list' | 'detail'
 
-// ─── Status config ────────────────────────────────────────────────────────────
+// â”€â”€â”€ Status config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const STATUS_CONFIG: Record<string, { label: string; badge: string; pulse?: boolean }> = {
   new:       { label: 'Nuevo',          badge: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300' },
   sent:      { label: 'En cocina',      badge: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' },
   preparing: { label: 'Preparando',     badge: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300', pulse: true },
-  ready:     { label: 'Listo ✓',        badge: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300', pulse: true },
+  ready:     { label: 'Listo âœ“',        badge: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300', pulse: true },
   delivered: { label: 'Entregado',      badge: 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300' },
   closed:    { label: 'Finalizado',     badge: 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400' },
   cancelled: { label: 'Anulado',        badge: 'bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400' },
@@ -134,12 +120,6 @@ function getOrderLabel(order: DBOrder, tables: Props['tables']): string {
   }
   if (order.type === 'bar') return 'Barra'
   return order.customerName ?? 'Domicilio'
-}
-
-function getOriginLabel(origin: OrderOrigin): string {
-  if (origin.type === 'table') return origin.tableName
-  if (origin.type === 'bar') return 'Barra'
-  return origin.customerName || 'Domicilio'
 }
 
 function getOriginIcon(type: string) {
@@ -156,7 +136,7 @@ function elapsedLabel(createdAt: string): string {
 }
 
 
-// ─── Main component ────────────────────────────────────────────────────────────
+// â”€â”€â”€ Main component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function PedidosScreen({
   categories, products, tables, userId,
@@ -166,28 +146,18 @@ export function PedidosScreen({
   const { toast } = useToast()
   const fmt = (n: number) => formatCurrency(n, currencySign)
 
-  // ── View state
+  // â”€â”€ View state
   const [view, setView] = useState<View>('list')
   const [dbOrders, setDbOrders] = useState<DBOrder[]>([])
   const [refreshing, setRefreshing] = useState(false)
 
-  // ── Editing state (local, before sending)
-  const [localOrder, setLocalOrder] = useState<LocalOrder | null>(null)
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
-  const [search, setSearch] = useState('')
+  // â”€â”€ Modifiers modal (for add-to-order)
   const [modifiersProduct, setModifiersProduct] = useState<ProductWithModifiers | null>(null)
 
-  // ── Origin picker state
-  const [showOriginPicker, setShowOriginPicker] = useState(false)
-  const [originStep, setOriginStep] = useState<OriginStep>('main')
-  const [deliveryForm, setDeliveryForm] = useState({
-    customerName: '', customerPhone: '', customerAddress: '', customerNotes: '', deliveryFee: 0,
-  })
-
-  // ── Detail state (DB order)
+  // â”€â”€ Detail state (DB order)
   const [detailOrder, setDetailOrder] = useState<DBOrder | null>(null)
 
-  // ── Pay modal state
+  // â”€â”€ Pay modal state
   const [showPayModal, setShowPayModal] = useState(false)
   const [payingOrder, setPayingOrder] = useState<DBOrder | null>(null)
   const [payLines, setPayLines] = useState<{ method: string; amount: string }[]>([])
@@ -195,14 +165,7 @@ export function PedidosScreen({
   const [payCustomerName, setPayCustomerName] = useState('')
   const [paying, setPaying] = useState(false)
 
-  // ── Custom product state
-  const [showCustomProduct, setShowCustomProduct] = useState(false)
-  const [customForm, setCustomForm] = useState({ name: '', price: '' })
-
-  // ── Modifier modal context (which cart to add to)
-  const [modifiersContext, setModifiersContext] = useState<'new' | 'add'>('new')
-
-  // ── Add-to-order state
+  // â”€â”€ Add-to-order state
   const [showAddToOrder, setShowAddToOrder] = useState(false)
   const [addToOrderItems, setAddToOrderItems] = useState<LocalItem[]>([])
   const [addSearch, setAddSearch] = useState('')
@@ -211,10 +174,7 @@ export function PedidosScreen({
   const [addCustomForm, setAddCustomForm] = useState({ name: '', price: '' })
   const [submittingAdd, setSubmittingAdd] = useState(false)
 
-  // ── Sending state
-  const [sending, setSending] = useState(false)
-
-  // ── Fetch orders ──────────────────────────────────────────────────────────
+  // â”€â”€ Fetch orders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const fetchOrders = useCallback(async () => {
     try {
@@ -237,7 +197,7 @@ export function PedidosScreen({
     setRefreshing(false)
   }
 
-  // ── Grouped orders ────────────────────────────────────────────────────────
+  // â”€â”€ Grouped orders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const readyOrders = useMemo(() => dbOrders.filter((o) => o.status === 'ready'), [dbOrders])
   const inProgressOrders = useMemo(
@@ -246,25 +206,7 @@ export function PedidosScreen({
   )
   const deliveredOrders = useMemo(() => dbOrders.filter((o) => o.status === 'delivered'), [dbOrders])
 
-  // ── Catalog helpers ───────────────────────────────────────────────────────
-
-  const filteredProducts = useMemo(() => {
-    if (!search && !selectedCategory) return []
-    const available = products.filter((p) => p.isAvailable !== false)
-    if (search) return available.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()))
-    return available.filter((p) => p.categoryId === selectedCategory)
-  }, [products, selectedCategory, search])
-
-  const activeCategories = useMemo(() => {
-    const ids = new Set(products.filter((p) => p.isAvailable !== false).map((p) => p.categoryId))
-    return categories.filter((c) => ids.has(c.id))
-  }, [products, categories])
-
-  const selectedCatPedidos = selectedCategory
-    ? categories.find((c) => c.id === selectedCategory) ?? null
-    : null
-
-  // ── Add-to-order catalog filter ───────────────────────────────────────────
+  // â”€â”€ Add-to-order catalog filter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const addFilteredProducts = useMemo(() => {
     let list = products
@@ -278,126 +220,7 @@ export function PedidosScreen({
     0,
   )
 
-  // ── Cart totals ───────────────────────────────────────────────────────────
-
-  const cartTotals = useMemo(() => {
-    if (!localOrder || localOrder.items.length === 0) return null
-    const cartItems: CalcItem[] = localOrder.items.map((i) => ({
-      id: i.id,
-      productId: i.productId,
-      productName: i.name,
-      unitPrice: i.unitPrice,
-      quantity: i.quantity,
-      modifiers: i.modifiers,
-      notes: i.notes,
-    }))
-    const prodsForCalc = products.map((p) => ({
-      id: p.id,
-      taxRateId: p.taxRateId ?? null,
-      taxRate: p.taxRate,
-      taxName: p.taxName ?? null,
-    }))
-    const deliveryFee = localOrder.origin.type === 'delivery' ? localOrder.origin.deliveryFee : 0
-    return calcOrderTotals(cartItems, prodsForCalc, { deliveryFee })
-  }, [localOrder, products])
-
-  // ── Actions ───────────────────────────────────────────────────────────────
-
-  function openOriginPicker() {
-    setOriginStep('main')
-    setDeliveryForm({ customerName: '', customerPhone: '', customerAddress: '', customerNotes: '', deliveryFee: 0 })
-    setShowOriginPicker(true)
-  }
-
-  function startOrder(origin: OrderOrigin) {
-    setLocalOrder({ origin, items: [] })
-    setShowOriginPicker(false)
-    setView('editing')
-  }
-
-  function addItem(item: Omit<LocalItem, 'id'>) {
-    setLocalOrder((prev) =>
-      prev ? { ...prev, items: [...prev.items, { ...item, id: crypto.randomUUID() }] } : prev,
-    )
-  }
-
-  function removeItem(id: string) {
-    setLocalOrder((prev) => prev ? { ...prev, items: prev.items.filter((i) => i.id !== id) } : prev)
-  }
-
-  function updateQty(id: string, delta: number) {
-    setLocalOrder((prev) => {
-      if (!prev) return prev
-      const items = prev.items
-        .map((i) => i.id === id ? { ...i, quantity: i.quantity + delta } : i)
-        .filter((i) => i.quantity > 0)
-      return { ...prev, items }
-    })
-  }
-
-  function handleProductTap(product: ProductWithModifiers) {
-    if (product.modifierGroups.length > 0) {
-      setModifiersContext('new')
-      setModifiersProduct(product)
-    } else {
-      addItem({
-        productId: product.id,
-        name: product.name,
-        unitPrice: parseFloat(product.price),
-        quantity: 1,
-        modifiers: [],
-        notes: '',
-      })
-    }
-  }
-
-  async function sendToKitchen() {
-    if (!localOrder || localOrder.items.length === 0) return
-    setSending(true)
-    try {
-      const body = {
-        type: localOrder.origin.type,
-        ...(localOrder.origin.type === 'table' && { tableId: localOrder.origin.tableId }),
-        ...(localOrder.origin.type === 'delivery' && {
-          customerName: localOrder.origin.customerName,
-          customerPhone: localOrder.origin.customerPhone,
-          customerAddress: localOrder.origin.customerAddress,
-          customerNotes: localOrder.origin.customerNotes,
-          deliveryFee: localOrder.origin.deliveryFee,
-        }),
-        items: localOrder.items.map((i) => ({
-          ...(i.productId
-            ? { productId: i.productId }
-            : { customName: i.name, customPrice: i.unitPrice }),
-          quantity: i.quantity,
-          notes: i.notes || undefined,
-          modifiers: i.modifiers,
-        })),
-        localId: crypto.randomUUID(),
-      }
-      const res = await fetch('/api/tenant/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-      if (!res.ok) throw new Error()
-      const { data } = await res.json()
-      // Update sent order to 'sent' status
-      await fetch(`/api/tenant/orders/${data.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'sent' }),
-      })
-      toast({ variant: 'success', title: 'Pedido enviado a cocina' })
-      setLocalOrder(null)
-      setView('list')
-      await fetchOrders()
-    } catch {
-      toast({ variant: 'destructive', title: 'Error al enviar el pedido' })
-    } finally {
-      setSending(false)
-    }
-  }
+  // â”€â”€ Actions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   async function markDelivered(orderId: string) {
     const found = dbOrders.find((o) => o.id === orderId)
@@ -495,7 +318,7 @@ export function PedidosScreen({
       })
       if (!res.ok) throw new Error()
       const label = getOrderLabel(payingOrder, tables)
-      toast({ variant: 'success', title: `${label} — pago registrado`, description: 'Cobrado' })
+      toast({ variant: 'success', title: `${label} â€” pago registrado`, description: 'Cobrado' })
       setShowPayModal(false)
       setPayingOrder(null)
       if (view === 'detail') setView('list')
@@ -565,7 +388,7 @@ export function PedidosScreen({
   // aliases
   const orders = dbOrders
 
-  // ── Pay modal totals ──────────────────────────────────────────────────────
+  // â”€â”€ Pay modal totals â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const paySubtotal = parseFloat(payingOrder?.subtotal ?? '0')
   const payTotal = parseFloat(payingOrder?.total ?? '0')
@@ -577,9 +400,9 @@ export function PedidosScreen({
   const payRemaining = Math.max(0, payTotal - totalReceived)
   const isPayCredit = !!(payLines[0] && paymentMethods.find((m) => m.key === payLines[0].method)?.isCredit)
 
-  // ─────────────────────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Header (shared across all views)
-  // ─────────────────────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const Header = ({ onBack, title }: { onBack?: () => void; title?: string }) => (
     <div className="flex items-center h-14 px-4 border-b shrink-0 bg-background gap-3">
@@ -610,9 +433,9 @@ export function PedidosScreen({
     </div>
   )
 
-  // ─────────────────────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Order card (list view)
-  // ─────────────────────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   function OrderCard({ order }: { order: DBOrder }) {
     const cfg = STATUS_CONFIG[order.status] ?? STATUS_CONFIG.new
@@ -674,7 +497,7 @@ export function PedidosScreen({
                 className="flex-1 border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950"
                 onClick={() => changeStatus(order.id, 'ready')}
               >
-                Listo ✓
+                Listo âœ“
               </Button>
             </>
           )}
@@ -687,7 +510,7 @@ export function PedidosScreen({
               className="flex-1 border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950"
               onClick={() => changeStatus(order.id, 'ready')}
             >
-              Marcar listo ✓
+              Marcar listo âœ“
             </Button>
           )}
 
@@ -717,9 +540,9 @@ export function PedidosScreen({
     )
   }
 
-  // ─────────────────────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // LIST VIEW
-  // ─────────────────────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   if (view === 'list') {
     return (
@@ -730,15 +553,9 @@ export function PedidosScreen({
           {/* Top bar */}
           <div className="flex items-center justify-between">
             <h1 className="text-xl font-bold">Pedidos activos</h1>
-            <div className="flex gap-2">
-              <Button variant="ghost" size="icon" onClick={manualRefresh} disabled={refreshing}>
-                <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-              </Button>
-              <Button onClick={openOriginPicker} className="gap-2">
-                <Plus className="h-4 w-4" />
-                Nuevo pedido
-              </Button>
-            </div>
+            <Button variant="ghost" size="icon" onClick={manualRefresh} disabled={refreshing}>
+              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            </Button>
           </div>
 
           {/* Empty state */}
@@ -746,14 +563,10 @@ export function PedidosScreen({
             <div className="flex flex-col items-center justify-center py-20 text-center gap-4">
               <UtensilsCrossed className="h-14 w-14 text-muted-foreground/30" />
               <p className="text-muted-foreground text-lg">Sin pedidos activos</p>
-              <Button onClick={openOriginPicker} size="lg" className="gap-2 mt-2">
-                <Plus className="h-5 w-5" />
-                Crear primer pedido
-              </Button>
             </div>
           )}
 
-          {/* Ready — highest priority */}
+          {/* Ready â€” highest priority */}
           {readyOrders.length > 0 && (
             <section>
               <div className="flex items-center gap-2 mb-3">
@@ -795,303 +608,15 @@ export function PedidosScreen({
           )}
         </div>
 
-        {/* Origin picker modal */}
-        {OriginPickerModal()}
-
         {/* Pay modal */}
         {showPayModal && payingOrder && PayModal()}
       </div>
     )
   }
 
-  // ─────────────────────────────────────────────────────────────────────────────
-  // EDITING VIEW (new local order)
-  // ─────────────────────────────────────────────────────────────────────────────
-
-  if (view === 'editing' && localOrder) {
-    const origin = localOrder.origin
-    const title = getOriginLabel(origin)
-
-    return (
-      <div className="flex flex-col h-full">
-        {isMesero && Header({ onBack: () => { setLocalOrder(null); setView('list') }, title: `${title} — Nuevo pedido` })}
-
-        <div className="flex-1 overflow-hidden grid grid-cols-1 lg:grid-cols-5">
-          {/* Catalog panel */}
-          <div className="lg:col-span-3 flex flex-col overflow-hidden border-r">
-            {/* Search */}
-            <div className="p-3 border-b">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  className="pl-9"
-                  placeholder="Buscar producto..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              </div>
-            </div>
-
-            {/* Breadcrumb */}
-            {selectedCatPedidos && !search && (
-              <button
-                onClick={() => setSelectedCategory(null)}
-                className="flex items-center gap-2 px-4 py-2.5 border-b w-full text-sm font-medium text-primary hover:bg-primary/5 transition-colors"
-              >
-                <ChevronLeft className="h-4 w-4" />
-                {selectedCatPedidos.emoji} {selectedCatPedidos.name}
-              </button>
-            )}
-
-            {/* Contenido */}
-            <div className="flex-1 overflow-y-auto">
-              {!selectedCategory && !search ? (
-                // Grid de categorías
-                activeCategories.length > 0 ? (
-                  <div className="grid grid-cols-3 gap-3 p-3">
-                    {activeCategories.map((cat) => (
-                      <button
-                        key={cat.id}
-                        onClick={() => setSelectedCategory(cat.id)}
-                        className="flex flex-col items-center gap-2 rounded-xl border bg-card p-4 hover:border-primary hover:bg-primary/5 transition-all active:scale-95"
-                      >
-                        <span className="text-3xl">{cat.emoji ?? '📦'}</span>
-                        <span className="text-xs font-semibold text-center leading-tight line-clamp-2">{cat.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-center text-muted-foreground py-12 text-sm">Sin categorías</p>
-                )
-              ) : (
-                // Lista de productos
-                <div>
-                  {filteredProducts.map((product) => {
-                    const hasOptions = product.modifierGroups.length > 0
-                    return (
-                      <button
-                        key={product.id}
-                        onClick={() => handleProductTap(product)}
-                        className="w-full flex items-center gap-3 px-4 py-3 border-b text-left hover:bg-muted/50 transition-colors"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm leading-tight truncate">{product.name}</p>
-                          {hasOptions && (
-                            <p className="text-xs text-muted-foreground mt-0.5">Personalizable</p>
-                          )}
-                        </div>
-                        <span className="text-sm font-semibold text-primary shrink-0">
-                          {fmt(parseFloat(product.price))}
-                        </span>
-                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                          <Plus className="h-4 w-4 text-primary" />
-                        </div>
-                      </button>
-                    )
-                  })}
-                  {filteredProducts.length === 0 && (
-                    <p className="text-center text-muted-foreground py-12 text-sm">
-                      {search ? 'Sin resultados' : 'Sin productos en esta categoría'}
-                    </p>
-                  )}
-                  {/* Producto libre */}
-                  <button
-                    onClick={() => { setCustomForm({ name: '', price: '' }); setShowCustomProduct(true) }}
-                    className="w-full flex items-center gap-3 px-4 py-3 border-b text-left hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-muted-foreground">Producto libre</p>
-                      <p className="text-xs text-muted-foreground">Nombre y precio al momento</p>
-                    </div>
-                    <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center shrink-0">
-                      <Plus className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Cart panel */}
-          <div className="lg:col-span-2 flex flex-col overflow-hidden">
-            <div className="p-3 border-b flex items-center gap-2">
-              {!isMesero && (
-                <button
-                  onClick={() => { setLocalOrder(null); setView('list') }}
-                  className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors shrink-0"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                  Pedidos
-                </button>
-              )}
-              <p className="font-semibold text-sm truncate">{title}</p>
-            </div>
-
-            {/* Items list */}
-            <div className="flex-1 overflow-y-auto p-3 space-y-2">
-              {localOrder.items.length === 0 && (
-                <p className="text-center text-muted-foreground text-sm py-8">
-                  Toca un producto para añadirlo
-                </p>
-              )}
-              {localOrder.items.map((item) => (
-                <div key={item.id} className="rounded-lg border bg-card p-3 space-y-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium leading-snug truncate">{item.name}</p>
-                      {item.modifiers.length > 0 && (
-                        <p className="text-xs text-muted-foreground truncate">
-                          {item.modifiers.map((m) => m.modifierName).join(', ')}
-                        </p>
-                      )}
-                    </div>
-                    <span className="text-sm font-semibold shrink-0">
-                      {fmt(item.unitPrice * item.quantity + item.modifiers.reduce((s, m) => s + m.priceDelta, 0) * item.quantity)}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => updateQty(item.id, -1)}
-                      className="h-7 w-7 rounded-md border flex items-center justify-center hover:bg-muted transition-colors"
-                    >
-                      <Minus className="h-3 w-3" />
-                    </button>
-                    <span className="w-6 text-center text-sm font-semibold">{item.quantity}</span>
-                    <button
-                      onClick={() => updateQty(item.id, 1)}
-                      className="h-7 w-7 rounded-md border flex items-center justify-center hover:bg-muted transition-colors"
-                    >
-                      <Plus className="h-3 w-3" />
-                    </button>
-                    <button
-                      onClick={() => removeItem(item.id)}
-                      className="ml-auto h-7 w-7 rounded-md border border-red-200 flex items-center justify-center text-red-500 hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Totals + action */}
-            <div className="border-t p-3 space-y-3">
-              {cartTotals && (
-                <div className="space-y-1 text-sm">
-                  <div className="flex justify-between text-muted-foreground">
-                    <span>Subtotal</span><span>{fmt(cartTotals.subtotal)}</span>
-                  </div>
-                  {cartTotals.taxLines.map((tl, i) => (
-                    <div key={i} className="flex justify-between text-muted-foreground">
-                      <span>{tl.name} ({tl.rate}%)</span><span>{fmt(tl.amount)}</span>
-                    </div>
-                  ))}
-                  {cartTotals.deliveryFee > 0 && (
-                    <div className="flex justify-between text-muted-foreground">
-                      <span>Domicilio</span><span>{fmt(cartTotals.deliveryFee)}</span>
-                    </div>
-                  )}
-                  <Separator />
-                  <div className="flex justify-between font-bold text-base">
-                    <span>Total</span><span>{fmt(cartTotals.total)}</span>
-                  </div>
-                </div>
-              )}
-              <Button
-                className="w-full h-12 text-base font-semibold"
-                disabled={localOrder.items.length === 0 || sending}
-                onClick={sendToKitchen}
-              >
-                {sending ? 'Enviando...' : 'Enviar a cocina'}
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* Modifiers modal */}
-        {modifiersProduct && (
-          <ModifiersModal
-            product={modifiersProduct}
-            currencySign={currencySign}
-            onClose={() => setModifiersProduct(null)}
-            onAdd={(item) => {
-              const cartItem = {
-                productId: item.productId,
-                name: item.productName,
-                unitPrice: item.unitPrice,
-                quantity: item.quantity,
-                modifiers: item.modifiers,
-                notes: item.notes,
-              }
-              if (modifiersContext === 'add') {
-                addItemToAdd(cartItem)
-              } else {
-                addItem(cartItem)
-              }
-              setModifiersProduct(null)
-            }}
-          />
-        )}
-
-        {/* Custom product dialog */}
-        <Dialog open={showCustomProduct} onOpenChange={setShowCustomProduct}>
-          <DialogContent className="max-w-sm">
-            <DialogHeader>
-              <DialogTitle>Producto libre</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-3">
-              <div className="space-y-1.5">
-                <Label>Descripción *</Label>
-                <Input
-                  autoFocus
-                  value={customForm.name}
-                  onChange={(e) => setCustomForm((f) => ({ ...f, name: e.target.value }))}
-                  placeholder="Ej: Sopa del día"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Precio *</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  step="500"
-                  value={customForm.price}
-                  onChange={(e) => setCustomForm((f) => ({ ...f, price: e.target.value }))}
-                  placeholder="0"
-                />
-              </div>
-              <div className="flex gap-2 pt-1">
-                <Button variant="outline" className="flex-1" onClick={() => setShowCustomProduct(false)}>
-                  Cancelar
-                </Button>
-                <Button
-                  className="flex-1"
-                  disabled={!customForm.name.trim() || !customForm.price || parseFloat(customForm.price) <= 0}
-                  onClick={() => {
-                    addItem({
-                      productId: null,
-                      name: customForm.name.trim(),
-                      unitPrice: parseFloat(customForm.price),
-                      quantity: 1,
-                      modifiers: [],
-                      notes: '',
-                    })
-                    setShowCustomProduct(false)
-                  }}
-                >
-                  Agregar
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-      </div>
-    )
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // DETAIL VIEW (DB order)
-  // ─────────────────────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   if (view === 'detail' && detailOrder) {
     const cfg = STATUS_CONFIG[detailOrder.status] ?? STATUS_CONFIG.new
@@ -1157,7 +682,7 @@ export function PedidosScreen({
                   <div key={item.id} className={`p-3 flex items-start justify-between gap-3 ${isCancelled ? 'opacity-50' : ''}`}>
                     <div className="flex-1 min-w-0">
                       <p className={`font-medium text-sm ${isCancelled ? 'line-through text-muted-foreground' : ''}`}>
-                        <span className="text-muted-foreground mr-1.5">{item.quantity}×</span>
+                        <span className="text-muted-foreground mr-1.5">{item.quantity}Ã—</span>
                         {item.productSnapshot?.name}
                       </p>
                       {(item.modifierSnapshot ?? []).length > 0 && (
@@ -1270,9 +795,9 @@ export function PedidosScreen({
     )
   }
 
-  // ─────────────────────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // ADD TO ORDER MODAL
-  // ─────────────────────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   function AddToOrderModal() {
     return (
@@ -1322,7 +847,6 @@ export function PedidosScreen({
                       key={product.id}
                       onClick={() => {
                         if (product.modifierGroups.length > 0) {
-                          setModifiersContext('add')
                           setModifiersProduct(product)
                         } else {
                           addItemToAdd({ productId: product.id, name: product.name, unitPrice: parseFloat(product.price), quantity: 1, modifiers: [], notes: '' })
@@ -1358,7 +882,7 @@ export function PedidosScreen({
               </div>
               <div className="flex-1 overflow-y-auto p-3 space-y-2">
                 {addToOrderItems.length === 0 && (
-                  <p className="text-center text-muted-foreground text-sm py-8">Toca un producto para añadirlo</p>
+                  <p className="text-center text-muted-foreground text-sm py-8">Toca un producto para aÃ±adirlo</p>
                 )}
                 {addToOrderItems.map((item) => (
                   <div key={item.id} className="rounded-lg border bg-card p-3 space-y-2">
@@ -1408,12 +932,12 @@ export function PedidosScreen({
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1.5">
-              <Label>Descripción *</Label>
+              <Label>DescripciÃ³n *</Label>
               <Input
                 autoFocus
                 value={addCustomForm.name}
                 onChange={(e) => setAddCustomForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="Ej: Sopa del día"
+                placeholder="Ej: Sopa del dÃ­a"
               />
             </div>
             <div className="space-y-1.5">
@@ -1449,180 +973,10 @@ export function PedidosScreen({
     )
   }
 
-  // ─────────────────────────────────────────────────────────────────────────────
-  // ORIGIN PICKER MODAL
-  // ─────────────────────────────────────────────────────────────────────────────
 
-  function OriginPickerModal() {
-    const zones = Array.from(new Set(tables.map((t) => t.zone)))
-
-    return (
-      <Dialog open={showOriginPicker} onOpenChange={setShowOriginPicker}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Nuevo pedido</DialogTitle>
-          </DialogHeader>
-
-          {originStep === 'main' ? (
-            <div className="space-y-4">
-              {/* Barra */}
-              <button
-                onClick={() => startOrder({ type: 'bar' })}
-                className="w-full rounded-xl border-2 p-4 text-left hover:border-primary hover:bg-primary/5 transition-colors flex items-center gap-4"
-              >
-                <div className="h-12 w-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0">
-                  <BarChart3 className="h-6 w-6 text-slate-600 dark:text-slate-300" />
-                </div>
-                <div>
-                  <p className="font-semibold text-base">Barra</p>
-                  <p className="text-sm text-muted-foreground">Consumir en el mostrador</p>
-                </div>
-              </button>
-
-              {/* Domicilio */}
-              <button
-                onClick={() => setOriginStep('delivery')}
-                className="w-full rounded-xl border-2 p-4 text-left hover:border-primary hover:bg-primary/5 transition-colors flex items-center gap-4"
-              >
-                <div className="h-12 w-12 rounded-xl bg-blue-50 dark:bg-blue-950 flex items-center justify-center shrink-0">
-                  <Truck className="h-6 w-6 text-blue-600" />
-                </div>
-                <div>
-                  <p className="font-semibold text-base">Domicilio</p>
-                  <p className="text-sm text-muted-foreground">Pedido para entrega a domicilio</p>
-                </div>
-              </button>
-
-              {/* Mesas */}
-              <div>
-                <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
-                  <UtensilsCrossed className="h-4 w-4" />
-                  Selecciona una mesa
-                </p>
-                {zones.map((zone) => (
-                  <div key={zone} className="mb-4">
-                    <p className="text-xs text-muted-foreground uppercase mb-2">{zone}</p>
-                    <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
-                      {tables.filter((t) => t.zone === zone).map((table) => {
-                        const occupied = table.status === 'occupied'
-                        return (
-                          <button
-                            key={table.id}
-                            onClick={() => startOrder({ type: 'table', tableId: table.id, tableName: table.name })}
-                            className={`rounded-xl border-2 p-3 text-center text-sm font-semibold transition-colors ${
-                              occupied
-                                ? 'border-red-200 bg-red-50 text-red-600 dark:border-red-900 dark:bg-red-950 dark:text-red-400'
-                                : 'hover:border-primary hover:bg-primary/5'
-                            }`}
-                          >
-                            {table.name}
-                            {occupied && <div className="text-xs font-normal opacity-70">Ocupada</div>}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-                ))}
-                {tables.length === 0 && (
-                  <p className="text-sm text-muted-foreground text-center py-4">Sin mesas configuradas</p>
-                )}
-              </div>
-            </div>
-          ) : (
-            /* Delivery form */
-            <div className="space-y-4">
-              <button
-                onClick={() => setOriginStep('main')}
-                className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <ChevronLeft className="h-4 w-4" />
-                Atrás
-              </button>
-
-              <div className={deliveryFields.phone ? 'grid grid-cols-2 gap-3' : ''}>
-                <div className="space-y-1.5">
-                  <Label>Nombre y apellido *</Label>
-                  <Input
-                    value={deliveryForm.customerName}
-                    onChange={(e) => setDeliveryForm((f) => ({ ...f, customerName: e.target.value }))}
-                    placeholder="Carlos López"
-                  />
-                </div>
-                {deliveryFields.phone && (
-                  <div className="space-y-1.5">
-                    <Label>Teléfono</Label>
-                    <Input
-                      value={deliveryForm.customerPhone}
-                      onChange={(e) => setDeliveryForm((f) => ({ ...f, customerPhone: e.target.value }))}
-                      placeholder="311 234 5678"
-                    />
-                  </div>
-                )}
-              </div>
-
-              {deliveryFields.address && (
-                <div className="space-y-1.5">
-                  <Label>Dirección</Label>
-                  <Input
-                    value={deliveryForm.customerAddress}
-                    onChange={(e) => setDeliveryForm((f) => ({ ...f, customerAddress: e.target.value }))}
-                    placeholder="Calle 50 #32-45"
-                  />
-                </div>
-              )}
-
-              {(deliveryFields.notes || deliveryFields.fee) && (
-                <div className={deliveryFields.notes && deliveryFields.fee ? 'grid grid-cols-2 gap-3' : ''}>
-                  {deliveryFields.notes && (
-                    <div className="space-y-1.5">
-                      <Label>Observaciones</Label>
-                      <Input
-                        value={deliveryForm.customerNotes}
-                        onChange={(e) => setDeliveryForm((f) => ({ ...f, customerNotes: e.target.value }))}
-                        placeholder="Tocar timbre"
-                      />
-                    </div>
-                  )}
-                  {deliveryFields.fee && (
-                    <div className="space-y-1.5">
-                      <Label>Valor domicilio ($)</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        value={deliveryForm.deliveryFee}
-                        onChange={(e) => setDeliveryForm((f) => ({ ...f, deliveryFee: Number(e.target.value) }))}
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <Button
-                className="w-full"
-                disabled={!deliveryForm.customerName.trim()}
-                onClick={() =>
-                  startOrder({
-                    type: 'delivery',
-                    customerName: deliveryForm.customerName,
-                    customerPhone: deliveryForm.customerPhone,
-                    customerAddress: deliveryForm.customerAddress,
-                    customerNotes: deliveryForm.customerNotes,
-                    deliveryFee: deliveryForm.deliveryFee,
-                  })
-                }
-              >
-                Continuar al pedido
-              </Button>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-    )
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // PAY MODAL
-  // ─────────────────────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   function PayModal() {
     if (!payingOrder) return null
@@ -1632,7 +986,7 @@ export function PedidosScreen({
       <Dialog open={showPayModal} onOpenChange={(open) => { if (!open) { setShowPayModal(false); setPayingOrder(null) } }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Cobrar — {label}</DialogTitle>
+            <DialogTitle>Cobrar â€” {label}</DialogTitle>
           </DialogHeader>
 
           {/* Order summary */}
@@ -1704,9 +1058,9 @@ export function PedidosScreen({
             </button>
           </div>
 
-          {/* Montos rápidos */}
+          {/* Montos rÃ¡pidos */}
           <div className="space-y-1.5">
-            <Label>Monto rápido</Label>
+            <Label>Monto rÃ¡pido</Label>
             <div className="flex flex-wrap gap-2">
               {[10000, 20000, 50000, 100000].map((amt) => (
                 <button
@@ -1747,12 +1101,12 @@ export function PedidosScreen({
             )}
             {payChange === 0 && payRemaining === 0 && totalReceived > 0 && (
               <div className="flex justify-between font-semibold text-emerald-600">
-                <span>Cuadra exacto</span><span>✓</span>
+                <span>Cuadra exacto</span><span>âœ“</span>
               </div>
             )}
           </div>
 
-          {/* Nombre del cliente — obligatorio para crédito */}
+          {/* Nombre del cliente â€” obligatorio para crÃ©dito */}
           {isPayCredit && (
             <div className="space-y-1.5">
               <Label>Nombre del cliente <span className="text-destructive">*</span></Label>
