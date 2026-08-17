@@ -249,11 +249,20 @@ export function PedidosScreen({
   // ── Catalog helpers ───────────────────────────────────────────────────────
 
   const filteredProducts = useMemo(() => {
-    let list = products
-    if (selectedCategory) list = list.filter((p) => p.categoryId === selectedCategory)
-    if (search) list = list.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()))
-    return list
+    if (!search && !selectedCategory) return []
+    const available = products.filter((p) => p.isAvailable !== false)
+    if (search) return available.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()))
+    return available.filter((p) => p.categoryId === selectedCategory)
   }, [products, selectedCategory, search])
+
+  const activeCategories = useMemo(() => {
+    const ids = new Set(products.filter((p) => p.isAvailable !== false).map((p) => p.categoryId))
+    return categories.filter((c) => ids.has(c.id))
+  }, [products, categories])
+
+  const selectedCatPedidos = selectedCategory
+    ? categories.find((c) => c.id === selectedCategory) ?? null
+    : null
 
   // ── Add-to-order catalog filter ───────────────────────────────────────────
 
@@ -810,8 +819,8 @@ export function PedidosScreen({
         <div className="flex-1 overflow-hidden grid grid-cols-1 lg:grid-cols-5">
           {/* Catalog panel */}
           <div className="lg:col-span-3 flex flex-col overflow-hidden border-r">
-            {/* Search + categories */}
-            <div className="p-3 border-b space-y-2">
+            {/* Search */}
+            <div className="p-3 border-b">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -821,63 +830,85 @@ export function PedidosScreen({
                   onChange={(e) => setSearch(e.target.value)}
                 />
               </div>
-              <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-                <button
-                  onClick={() => setSelectedCategory(null)}
-                  className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
-                    !selectedCategory ? 'bg-primary text-primary-foreground border-primary' : 'hover:bg-muted'
-                  }`}
-                >
-                  Todo
-                </button>
-                {categories.map((c) => (
-                  <button
-                    key={c.id}
-                    onClick={() => setSelectedCategory(c.id === selectedCategory ? null : c.id)}
-                    className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium border transition-colors whitespace-nowrap ${
-                      selectedCategory === c.id ? 'bg-primary text-primary-foreground border-primary' : 'hover:bg-muted'
-                    }`}
-                  >
-                    {c.emoji ? `${c.emoji} ` : ''}{c.name}
-                  </button>
-                ))}
-              </div>
             </div>
 
-            {/* Product grid */}
-            <div className="flex-1 overflow-y-auto p-3 space-y-3">
-              {filteredProducts.length === 0 && (
-                <p className="text-center text-muted-foreground py-12 text-sm">Sin productos</p>
-              )}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {filteredProducts.map((product) => (
-                  <button
-                    key={product.id}
-                    onClick={() => handleProductTap(product)}
-                    className="rounded-xl border bg-card p-3 text-left hover:border-primary hover:shadow-sm transition-all active:scale-95"
-                  >
-                    <div className="font-medium text-sm leading-snug mb-1">{product.name}</div>
-                    <div className="text-base font-bold text-primary">
-                      {fmt(parseFloat(product.price))}
-                    </div>
-                    {product.modifierGroups.length > 0 && (
-                      <div className="text-xs text-muted-foreground mt-1">Personalizable</div>
-                    )}
-                  </button>
-                ))}
-              </div>
+            {/* Breadcrumb */}
+            {selectedCatPedidos && !search && (
               <button
-                onClick={() => { setCustomForm({ name: '', price: '' }); setShowCustomProduct(true) }}
-                className="w-full rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 p-3 text-left hover:border-primary hover:bg-primary/5 transition-all flex items-center gap-3"
+                onClick={() => setSelectedCategory(null)}
+                className="flex items-center gap-2 px-4 py-2.5 border-b w-full text-sm font-medium text-primary hover:bg-primary/5 transition-colors"
               >
-                <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                  <Plus className="h-4 w-4 text-muted-foreground" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Producto libre</p>
-                  <p className="text-xs text-muted-foreground">Nombre y precio al momento</p>
-                </div>
+                <ChevronLeft className="h-4 w-4" />
+                {selectedCatPedidos.emoji} {selectedCatPedidos.name}
               </button>
+            )}
+
+            {/* Contenido */}
+            <div className="flex-1 overflow-y-auto">
+              {!selectedCategory && !search ? (
+                // Grid de categorías
+                activeCategories.length > 0 ? (
+                  <div className="grid grid-cols-3 gap-3 p-3">
+                    {activeCategories.map((cat) => (
+                      <button
+                        key={cat.id}
+                        onClick={() => setSelectedCategory(cat.id)}
+                        className="flex flex-col items-center gap-2 rounded-xl border bg-card p-4 hover:border-primary hover:bg-primary/5 transition-all active:scale-95"
+                      >
+                        <span className="text-3xl">{cat.emoji ?? '📦'}</span>
+                        <span className="text-xs font-semibold text-center leading-tight line-clamp-2">{cat.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-center text-muted-foreground py-12 text-sm">Sin categorías</p>
+                )
+              ) : (
+                // Lista de productos
+                <div>
+                  {filteredProducts.map((product) => {
+                    const hasOptions = product.modifierGroups.length > 0
+                    return (
+                      <button
+                        key={product.id}
+                        onClick={() => handleProductTap(product)}
+                        className="w-full flex items-center gap-3 px-4 py-3 border-b text-left hover:bg-muted/50 transition-colors"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm leading-tight truncate">{product.name}</p>
+                          {hasOptions && (
+                            <p className="text-xs text-muted-foreground mt-0.5">Personalizable</p>
+                          )}
+                        </div>
+                        <span className="text-sm font-semibold text-primary shrink-0">
+                          {fmt(parseFloat(product.price))}
+                        </span>
+                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                          <Plus className="h-4 w-4 text-primary" />
+                        </div>
+                      </button>
+                    )
+                  })}
+                  {filteredProducts.length === 0 && (
+                    <p className="text-center text-muted-foreground py-12 text-sm">
+                      {search ? 'Sin resultados' : 'Sin productos en esta categoría'}
+                    </p>
+                  )}
+                  {/* Producto libre */}
+                  <button
+                    onClick={() => { setCustomForm({ name: '', price: '' }); setShowCustomProduct(true) }}
+                    className="w-full flex items-center gap-3 px-4 py-3 border-b text-left hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-muted-foreground">Producto libre</p>
+                      <p className="text-xs text-muted-foreground">Nombre y precio al momento</p>
+                    </div>
+                    <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center shrink-0">
+                      <Plus className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 

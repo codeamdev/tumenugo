@@ -15,7 +15,7 @@ import { CloseOrderModal } from './close-order-modal'
 import { useToast } from '@/components/ui/use-toast'
 import {
   Plus, Minus, Trash2, ShoppingCart, Search,
-  UtensilsCrossed, Truck, BarChart3,
+  UtensilsCrossed, Truck, BarChart3, ChevronLeft,
 } from 'lucide-react'
 import { OfflineIndicator } from '@/components/offline-indicator'
 import type { PaymentMethodConfig } from '@/lib/payment-methods'
@@ -105,12 +105,20 @@ export function POSScreen({ categories, products, tables, userId, tenantName, cu
   const activeOrder = store.orders.find((o) => o.localId === store.activeOrderId) ?? null
 
   const filteredProducts = useMemo(() => {
-    return products.filter((p) => {
-      const matchCat = !selectedCategory || p.categoryId === selectedCategory
-      const matchSearch = !search || p.name.toLowerCase().includes(search.toLowerCase())
-      return matchCat && matchSearch
-    })
+    if (!search && !selectedCategory) return []
+    const available = products.filter((p) => p.isAvailable)
+    if (search) return available.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()))
+    return available.filter((p) => p.categoryId === selectedCategory)
   }, [products, selectedCategory, search])
+
+  const activeCategories = useMemo(() => {
+    const ids = new Set(products.filter((p) => p.isAvailable).map((p) => p.categoryId))
+    return categories.filter((c) => ids.has(c.id))
+  }, [products, categories])
+
+  const selectedCat = selectedCategory
+    ? categories.find((c) => c.id === selectedCategory) ?? null
+    : null
 
   const totals = useMemo(() => {
     if (!activeOrder) return null
@@ -331,8 +339,8 @@ export function POSScreen({ categories, products, tables, userId, tenantName, cu
 
       {/* ── CENTER: Product catalog ───────────────────────────────────────── */}
       <div className={`flex-col overflow-hidden flex-1 ${mobileTab === 'catalog' ? 'flex' : 'hidden md:flex'}`}>
-        {/* Search + categories */}
-        <div className="border-b p-3 space-y-3">
+        {/* Search */}
+        <div className="border-b p-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -343,70 +351,82 @@ export function POSScreen({ categories, products, tables, userId, tenantName, cu
               className="pl-9"
             />
           </div>
-          <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-            <button
-              onClick={() => setSelectedCategory(null)}
-              className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
-                !selectedCategory ? 'bg-primary text-primary-foreground border-primary' : 'bg-background hover:bg-muted'
-              }`}
-            >
-              Todos
-            </button>
-            {categories.map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => setSelectedCategory(cat.id === selectedCategory ? null : cat.id)}
-                className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
-                  cat.id === selectedCategory
-                    ? 'bg-primary text-primary-foreground border-primary'
-                    : 'bg-background hover:bg-muted'
-                }`}
-              >
-                {cat.emoji} {cat.name}
-              </button>
-            ))}
-          </div>
         </div>
 
-        {/* Product grid */}
-        <div className="flex-1 overflow-y-auto p-3">
-          <div className="pos-product-grid">
-            {filteredProducts.map((product) => (
-              <button
-                key={product.id}
-                onClick={() => handleProductClick(product)}
-                disabled={!product.isAvailable || !product.inStock}
-                className="relative flex flex-col items-start rounded-xl border bg-card p-3 text-left hover:border-primary hover:shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
-              >
-                {product.imageUrl && (
-                  <img
-                    src={product.imageUrl}
-                    alt={product.name}
-                    className="w-full h-20 object-cover rounded-md mb-2"
-                  />
-                )}
-                <span className="font-medium text-sm leading-tight line-clamp-2">{product.name}</span>
-                {product.description && (
-                  <span className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{product.description}</span>
-                )}
-                {!product.inStock ? (
-                  <span className="mt-2 text-xs font-semibold text-destructive bg-destructive/10 px-2 py-0.5 rounded-full">Agotado</span>
-                ) : (
-                  <span className="mt-2 font-semibold text-primary">
-                    {formatCurrency(product.price, currencySign)}
-                  </span>
-                )}
-                {((product.flavors?.length ?? 0) > 0 || product.modifierGroups.length > 0) && (
-                  <span className="absolute top-2 right-2 h-1.5 w-1.5 rounded-full bg-primary" title="Tiene opciones" />
-                )}
-              </button>
-            ))}
-          </div>
-          {filteredProducts.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-              <ShoppingCart className="h-8 w-8 mb-2" />
-              <p className="text-sm">No hay productos</p>
-            </div>
+        {/* Breadcrumb (categoría seleccionada, sin búsqueda) */}
+        {selectedCat && !search && (
+          <button
+            onClick={() => setSelectedCategory(null)}
+            className="flex items-center gap-2 px-4 py-2.5 border-b w-full text-sm font-medium text-primary hover:bg-primary/5 transition-colors"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            {selectedCat.emoji} {selectedCat.name}
+          </button>
+        )}
+
+        {/* Contenido */}
+        <div className="flex-1 overflow-y-auto">
+          {!selectedCategory && !search ? (
+            // Grid de categorías
+            activeCategories.length > 0 ? (
+              <div className="grid grid-cols-3 gap-3 p-3">
+                {activeCategories.map((cat) => (
+                  <button
+                    key={cat.id}
+                    onClick={() => setSelectedCategory(cat.id)}
+                    className="flex flex-col items-center gap-2 rounded-xl border bg-card p-4 hover:border-primary hover:bg-primary/5 transition-all active:scale-95"
+                  >
+                    <span className="text-3xl">{cat.emoji ?? '📦'}</span>
+                    <span className="text-xs font-semibold text-center leading-tight line-clamp-2">{cat.name}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                <ShoppingCart className="h-8 w-8 mb-2" />
+                <p className="text-sm">Sin categorías</p>
+              </div>
+            )
+          ) : (
+            // Lista de productos
+            filteredProducts.length > 0 ? (
+              <div>
+                {filteredProducts.map((product) => {
+                  const outOfStock = !product.inStock
+                  const hasOptions = (product.flavors?.length ?? 0) > 0 || product.modifierGroups.length > 0
+                  return (
+                    <button
+                      key={product.id}
+                      onClick={() => handleProductClick(product)}
+                      disabled={outOfStock}
+                      className="w-full flex items-center gap-3 px-4 py-3 border-b text-left hover:bg-muted/50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm leading-tight truncate">{product.name}</p>
+                        {outOfStock ? (
+                          <p className="text-xs font-semibold text-destructive mt-0.5">Agotado</p>
+                        ) : hasOptions ? (
+                          <p className="text-xs text-muted-foreground mt-0.5">Personalizable</p>
+                        ) : null}
+                      </div>
+                      {!outOfStock && (
+                        <span className="text-sm font-semibold text-primary shrink-0">
+                          {formatCurrency(product.price, currencySign)}
+                        </span>
+                      )}
+                      <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 ${outOfStock ? 'bg-destructive/10' : 'bg-primary/10'}`}>
+                        <Plus className={`h-4 w-4 ${outOfStock ? 'text-destructive rotate-45' : 'text-primary'}`} />
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                <ShoppingCart className="h-8 w-8 mb-2" />
+                <p className="text-sm">{search ? 'Sin resultados' : 'Sin productos en esta categoría'}</p>
+              </div>
+            )
           )}
         </div>
       </div>
