@@ -159,7 +159,7 @@ export async function POST(request: NextRequest) {
       })
 
       // Generate daily consecutive display code: PED-001 or DOM-001
-      const prefix = input.type === 'delivery' ? 'DOM' : 'PED'
+      const prefix = input.type === 'delivery' ? 'DOM' : input.type === 'bar' ? 'BAR' : 'PED'
       const todayStart = new Date()
       todayStart.setHours(0, 0, 0, 0)
       const todayEnd = new Date()

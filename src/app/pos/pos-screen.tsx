@@ -62,9 +62,10 @@ interface Props {
   deliveryFields?: DeliveryFields
   paymentMethods: PaymentMethodConfig[]
   defaultDeliveryFee?: number
+  barEnabled?: boolean
 }
 
-export function POSScreen({ categories, products, tables, userId, tenantName, currencySign, deliveryFields, paymentMethods, defaultDeliveryFee = 0 }: Props) {
+export function POSScreen({ categories, products, tables, userId, tenantName, currencySign, deliveryFields, paymentMethods, defaultDeliveryFee = 0, barEnabled = false }: Props) {
   const { toast } = useToast()
   const store = usePOSStore()
 
@@ -254,14 +255,16 @@ export function POSScreen({ categories, products, tables, userId, tenantName, cu
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Pedidos</p>
             <OfflineIndicator />
           </div>
-          <div className="grid grid-cols-3 gap-1.5">
-            <button
-              onClick={quickCreateBar}
-              className="flex flex-col items-center gap-1 rounded-lg border bg-background p-2 text-xs font-medium hover:border-primary hover:bg-primary/5 transition-colors"
-            >
-              <BarChart3 className="h-4 w-4" />
-              Barra
-            </button>
+          <div className={`grid gap-1.5 ${barEnabled ? 'grid-cols-3' : 'grid-cols-2'}`}>
+            {barEnabled && (
+              <button
+                onClick={quickCreateBar}
+                className="flex flex-col items-center gap-1 rounded-lg border bg-background p-2 text-xs font-medium hover:border-primary hover:bg-primary/5 transition-colors"
+              >
+                <BarChart3 className="h-4 w-4" />
+                Barra
+              </button>
+            )}
             <button
               onClick={() => setTablesPanelOpen((v) => !v)}
               className={`flex flex-col items-center gap-1 rounded-lg border p-2 text-xs font-medium transition-colors ${tablesPanelOpen ? 'border-primary bg-primary text-primary-foreground' : 'bg-background hover:border-primary hover:bg-primary/5'}`}
@@ -561,14 +564,16 @@ export function POSScreen({ categories, products, tables, userId, tenantName, cu
               <p className="font-medium">Sin pedido activo</p>
               <p className="text-sm mt-1">Selecciona un pedido o crea uno nuevo</p>
             </div>
-            <div className="grid grid-cols-3 gap-2 w-full max-w-xs">
-              <button
-                onClick={quickCreateBar}
-                className="flex flex-col items-center gap-1.5 rounded-xl border bg-background p-3 text-sm font-medium hover:border-primary hover:bg-primary/5 transition-colors"
-              >
-                <BarChart3 className="h-5 w-5" />
-                Barra
-              </button>
+            <div className={`grid gap-2 w-full max-w-xs ${barEnabled ? 'grid-cols-3' : 'grid-cols-2'}`}>
+              {barEnabled && (
+                <button
+                  onClick={quickCreateBar}
+                  className="flex flex-col items-center gap-1.5 rounded-xl border bg-background p-3 text-sm font-medium hover:border-primary hover:bg-primary/5 transition-colors"
+                >
+                  <BarChart3 className="h-5 w-5" />
+                  Barra
+                </button>
+              )}
               <button
                 onClick={() => { setMobileTab('orders'); setTablesPanelOpen(true) }}
                 className="flex flex-col items-center gap-1.5 rounded-xl border bg-background p-3 text-sm font-medium hover:border-primary hover:bg-primary/5 transition-colors"

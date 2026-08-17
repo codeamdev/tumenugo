@@ -8,7 +8,8 @@ import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/ui/use-toast'
 import { useRouter } from 'next/navigation'
-import { Settings, Palette, Globe, DollarSign, CheckCircle, Truck, CreditCard, LockOpen, Plus, Trash2, Bell } from 'lucide-react'
+import { Settings, Palette, Globe, DollarSign, CheckCircle, Truck, CreditCard, LockOpen, Plus, Trash2, Bell, GlassWater } from 'lucide-react'
+import { Switch } from '@/components/ui/switch'
 
 interface PaymentMethodConfig {
   key: string
@@ -27,6 +28,7 @@ interface TenantConfig {
     deliveryFields: { phone: boolean; address: boolean; notes: boolean; fee: boolean }
     paymentMethods?: { key: string; label: string; isCredit?: boolean }[] | string[]
     kitchenAlertMinutes?: number
+    barEnabled?: boolean
   } | null
 }
 
@@ -92,6 +94,7 @@ export default function ConfiguracionPage() {
     defaultOpeningAmount: 0,
     defaultDeliveryFee: 0,
     kitchenAlertMinutes: 0,
+    barEnabled: false,
   })
 
   useEffect(() => {
@@ -116,6 +119,7 @@ export default function ConfiguracionPage() {
           defaultOpeningAmount: d.posConfig?.defaultOpeningAmount ?? 0,
           defaultDeliveryFee: d.posConfig?.defaultDeliveryFee ?? 0,
           kitchenAlertMinutes: d.posConfig?.kitchenAlertMinutes ?? 0,
+          barEnabled: d.posConfig?.barEnabled ?? false,
         })
         setLoading(false)
       })
@@ -148,6 +152,7 @@ export default function ConfiguracionPage() {
             defaultOpeningAmount: form.defaultOpeningAmount,
             defaultDeliveryFee: form.defaultDeliveryFee,
             ...(form.kitchenAlertMinutes > 0 ? { kitchenAlertMinutes: form.kitchenAlertMinutes } : {}),
+            barEnabled: form.barEnabled,
           },
         }),
       })
@@ -359,6 +364,24 @@ export default function ConfiguracionPage() {
           <p className="text-xs text-muted-foreground">
             Monto de efectivo con el que se abre la caja automáticamente en el primer cobro del día.
           </p>
+        </div>
+      </Card>
+
+      {/* Barra */}
+      <Card className="p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <h2 className="font-semibold flex items-center gap-2">
+              <GlassWater className="h-4 w-4" /> Barra
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Activa el tipo de pedido "Barra" para atención en mostrador. Los pedidos de barra usan el código BAR-001, BAR-002…
+            </p>
+          </div>
+          <Switch
+            checked={form.barEnabled}
+            onCheckedChange={(v) => setForm((f) => ({ ...f, barEnabled: v }))}
+          />
         </div>
       </Card>
 

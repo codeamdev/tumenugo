@@ -33,6 +33,7 @@ export interface PosConfig {
   defaultOpeningAmount?: number
   defaultDeliveryFee?: number
   kitchenAlertMinutes?: number
+  barEnabled?: boolean
 }
 
 export const tenants = pgTable('tenants', {

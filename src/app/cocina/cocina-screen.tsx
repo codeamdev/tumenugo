@@ -156,11 +156,10 @@ export function CocinaScreen({ tenantName, primaryColor, tables, userName, kitch
   // ── Order card (called as function to avoid remount) ──────────────────────
 
   function OrderCard(order: KitchenOrder) {
-    const label = getOrderLabel(order, tables)
     const { label: timeLabel, urgency } = elapsedInfo(order.createdAt)
     const isPreparing = order.status === 'preparing'
     const elapsedMin = Math.floor((Date.now() - new Date(order.createdAt).getTime()) / 60000)
-    const isLate = isPreparing && kitchenAlertMinutes > 0 && elapsedMin >= kitchenAlertMinutes
+    const isLate = (order.status === 'sent' || isPreparing) && kitchenAlertMinutes > 0 && elapsedMin >= kitchenAlertMinutes
 
     const urgencyClass =
       urgency === 'urgent' ? 'text-red-600 dark:text-red-400' :
@@ -182,23 +181,25 @@ export function CocinaScreen({ tenantName, primaryColor, tables, userName, kitch
         {isLate && (
           <div className="rounded-md bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-700 px-3 py-1.5">
             <p className="text-xs font-bold text-red-700 dark:text-red-400 uppercase tracking-wide">
-              ⚠ DEMORADO — {elapsedMin} min en preparación
+              ⚠ DEMORADO — {elapsedMin} min
             </p>
           </div>
         )}
 
-        {/* Header row */}
+        {/* Header row: código + tiempo */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <span className="text-muted-foreground shrink-0">{getOriginIcon(order.type)}</span>
             <div>
-              <span className="text-xl font-bold truncate">{label}</span>
-              {order.displayCode && (
-                <span className="ml-2 text-sm font-mono text-muted-foreground">{order.displayCode}</span>
+              <span className="text-2xl font-black tracking-tight">
+                {order.displayCode ?? `#${order.id.slice(-6).toUpperCase()}`}
+              </span>
+              {order.type === 'delivery' && order.customerName && (
+                <p className="text-xs text-muted-foreground leading-none mt-0.5">{order.customerName}</p>
               )}
             </div>
           </div>
-          <div className={`flex items-center gap-1 text-sm font-semibold shrink-0 ${urgencyClass}`}>
+          <div className={`flex items-center gap-1 text-base font-bold shrink-0 ${urgencyClass}`}>
             {urgency === 'urgent' && <span className="animate-pulse">⚡</span>}
             {timeLabel}
           </div>

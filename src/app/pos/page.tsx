@@ -59,6 +59,7 @@ export default async function POSPage() {
   }
   const paymentMethods = getPaymentMethods(tenant.posConfig)
   const defaultDeliveryFee = tenant.posConfig?.defaultDeliveryFee ?? 0
+  const barEnabled = tenant.posConfig?.barEnabled ?? false
 
   return (
     <POSScreen
@@ -69,6 +70,7 @@ export default async function POSPage() {
       deliveryFields={deliveryFields}
       paymentMethods={paymentMethods}
       defaultDeliveryFee={defaultDeliveryFee}
+      barEnabled={barEnabled}
     />
   )
 }
