@@ -26,9 +26,13 @@ const closeSchema = z.object({
 })
 
 // GET /api/tenant/caja — returns current open register + summary + history
-export async function GET(_: NextRequest) {
+// ?type=history returns up to 100 closings (for the informe de cierres page)
+export async function GET(req: NextRequest) {
   await requireTenantSession()
   const tenant = await requireActiveTenant()
+
+  const url = new URL(req.url)
+  const historyLimit = url.searchParams.get('type') === 'history' ? 100 : 10
 
   const methodLabels = buildMethodLabels(tenant.posConfig as PosConfig | null)
 
@@ -45,7 +49,7 @@ export async function GET(_: NextRequest) {
       .from(cashRegisters)
       .where(eq(cashRegisters.status, 'closed'))
       .orderBy(desc(cashRegisters.closedAt))
-      .limit(10)
+      .limit(historyLimit)
 
     const serialise = (r: typeof register) => r ? {
       ...r,
@@ -176,6 +180,20 @@ export async function POST(req: NextRequest) {
 
         if (!register) throw new Error('No hay caja abierta')
 
+        // Block close if there are unpaid/open orders in this shift
+        const openOrders = await db
+          .select({ id: orders.id })
+          .from(orders)
+          .where(
+            and(
+              inArray(orders.status, ['new', 'sent', 'preparing', 'ready', 'delivered']),
+              gte(orders.createdAt, register.openedAt!)
+            )
+          )
+        if (openOrders.length > 0) {
+          throw new Error(`Hay ${openOrders.length} pedido(s) sin cerrar. Ciérralos o cancélalos antes de cerrar la caja.`)
+        }
+
         const closedOrders = await db
           .select()
           .from(orders)
@@ -194,6 +212,11 @@ export async function POST(req: NextRequest) {
           parseFloat(register.openingAmount ?? '0') + cashSales
 
         const difference = input.countedCash - expectedCash
+
+        // Observation is required when there is a cash difference
+        if (Math.abs(difference) > 0.01 && !input.notes?.trim()) {
+          throw new Error('Observación requerida cuando hay diferencia en el arqueo')
+        }
 
         const [closed] = await db
           .update(cashRegisters)
@@ -218,7 +241,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Acción inválida' }, { status: 400 })
   } catch (err) {
     if (err instanceof z.ZodError) return NextResponse.json({ error: err.issues }, { status: 400 })
-    if (err instanceof Error && (err.message.includes('Ya hay') || err.message.includes('No hay'))) {
+    if (err instanceof Error && (err.message.includes('Ya hay') || err.message.includes('No hay') || err.message.includes('Hay ') || err.message.includes('Observación requerida'))) {
       return NextResponse.json({ error: err.message }, { status: 409 })
     }
     console.error('Caja error:', err)

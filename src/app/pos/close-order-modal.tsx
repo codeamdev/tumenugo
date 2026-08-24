@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
@@ -49,12 +49,25 @@ export function CloseOrderModal({ order: _order, totals, currencySign, paymentMe
   const firstMethod = paymentMethods.find((m) => m.key === lines[0]?.method)
   const isCredit = firstMethod?.isCredit ?? false
 
+  // Auto-fill total when switching to credit method
+  useEffect(() => {
+    if (isCredit) {
+      setLines((prev) => [{ method: prev[0]?.method ?? defaultMethod, amount: String(Math.round(grandTotal)) }])
+    }
+  }, [isCredit, grandTotal, defaultMethod])
+
+  function fmtNum(raw: string) {
+    const n = raw.replace(/\D/g, '')
+    return n ? parseInt(n, 10).toLocaleString('es-CO') : ''
+  }
+
   function updateLine(idx: number, field: keyof PaymentLine, value: string) {
-    setLines((prev) => prev.map((l, i) => i === idx ? { ...l, [field]: value } : l))
+    const stored = field === 'amount' ? value.replace(/\D/g, '') : value
+    setLines((prev) => prev.map((l, i) => i === idx ? { ...l, [field]: stored } : l))
   }
 
   function addLine() {
-    setLines((prev) => [...prev, { method: defaultMethod, amount: remaining > 0 ? String(remaining) : '' }])
+    setLines((prev) => [...prev, { method: defaultMethod, amount: remaining > 0 ? String(Math.round(remaining)) : '' }])
   }
 
   function removeLine(idx: number) {
@@ -133,29 +146,31 @@ export function CloseOrderModal({ order: _order, totals, currencySign, paymentMe
                   </button>
                 ))}
               </div>
-              {/* Monto */}
-              <div className="flex gap-2 items-center">
-                <Input
-                  type="number"
-                  min="0"
-                  step="1000"
-                  placeholder={idx === 0 ? fmt(grandTotal) : '0'}
-                  value={line.amount}
-                  onChange={(e) => updateLine(idx, 'amount', e.target.value)}
-                  className="flex-1"
-                />
-                {lines.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => removeLine(idx)}
-                    className="p-2 text-muted-foreground hover:text-destructive transition-colors shrink-0"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
+              {/* Monto (oculto para crédito — se auto-completa) */}
+              {!isCredit && (
+                <div className="flex gap-2 items-center">
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder={idx === 0 ? fmt(grandTotal) : '0'}
+                    value={fmtNum(line.amount)}
+                    onChange={(e) => updateLine(idx, 'amount', e.target.value)}
+                    className="flex-1"
+                  />
+                  {lines.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeLine(idx)}
+                      className="p-2 text-muted-foreground hover:text-destructive transition-colors shrink-0"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           ))}
+          {!isCredit && (
           <button
             type="button"
             onClick={addLine}
@@ -164,31 +179,34 @@ export function CloseOrderModal({ order: _order, totals, currencySign, paymentMe
             <Plus className="h-3.5 w-3.5" />
             Agregar otra forma de pago
           </button>
+        )}
         </div>
 
-        {/* Montos rápidos */}
-        <div className="space-y-1.5">
-          <Label>Monto rápido</Label>
-          <div className="flex flex-wrap gap-2">
-            {QUICK_AMOUNTS.map((amt) => (
+        {/* Montos rápidos (ocultos para crédito) */}
+        {!isCredit && (
+          <div className="space-y-1.5">
+            <Label>Monto rápido</Label>
+            <div className="flex flex-wrap gap-2">
+              {QUICK_AMOUNTS.map((amt) => (
+                <button
+                  key={amt}
+                  type="button"
+                  onClick={() => updateLine(0, 'amount', String(amt))}
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold border border-primary text-primary hover:bg-primary/10 transition-colors"
+                >
+                  +{amt >= 1000 ? `${amt / 1000}k` : amt}
+                </button>
+              ))}
               <button
-                key={amt}
                 type="button"
-                onClick={() => updateLine(0, 'amount', String(amt))}
-                className="px-3 py-1.5 rounded-lg text-xs font-bold border border-primary text-primary hover:bg-primary/10 transition-colors"
+                onClick={() => updateLine(0, 'amount', String(Math.round(grandTotal)))}
+                className="px-3 py-1.5 rounded-lg text-xs font-bold border border-primary text-primary bg-primary/10 hover:bg-primary/20 transition-colors"
               >
-                +{amt >= 1000 ? `${amt / 1000}k` : amt}
+                Exacto
               </button>
-            ))}
-            <button
-              type="button"
-              onClick={() => updateLine(0, 'amount', String(grandTotal))}
-              className="px-3 py-1.5 rounded-lg text-xs font-bold border border-primary text-primary bg-primary/10 hover:bg-primary/20 transition-colors"
-            >
-              Exacto
-            </button>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Balance */}
         {totalPaid > 0 && (

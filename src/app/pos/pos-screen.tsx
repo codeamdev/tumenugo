@@ -377,9 +377,6 @@ export function POSScreen({ categories, products, tables, userId, tenantName, cu
                           {formatCurrency(product.price, currencySign)}
                         </span>
                       )}
-                      <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 ${outOfStock ? 'bg-destructive/10' : 'bg-primary/10'}`}>
-                        <Plus className={`h-4 w-4 ${outOfStock ? 'text-destructive rotate-45' : 'text-primary'}`} />
-                      </div>
                     </button>
                   )
                 })}

@@ -88,6 +88,10 @@ export function CajaClient({ register, summary, history, currencySign, paymentMe
 
   async function handleClose() {
     if (!countedCash) return
+    if (difference !== null && Math.abs(difference) > 0.01 && !closeNotes.trim()) {
+      toast({ title: 'Observación requerida', description: 'Debes ingresar una observación cuando hay diferencia en el arqueo.', variant: 'destructive' })
+      return
+    }
     setLoading(true)
     try {
       const res = await fetch('/api/tenant/caja', {
@@ -234,11 +238,10 @@ export function CajaClient({ register, summary, history, currencySign, paymentMe
               <div className="space-y-2">
                 <Label>Efectivo contado en caja ({currencySign})</Label>
                 <Input
-                  type="number"
-                  min="0"
-                  step="1000"
-                  value={countedCash}
-                  onChange={(e) => setCountedCash(e.target.value)}
+                  type="text"
+                  inputMode="numeric"
+                  value={countedCash ? parseInt(countedCash, 10).toLocaleString('es-CO') : ''}
+                  onChange={(e) => setCountedCash(e.target.value.replace(/\D/g, ''))}
                   placeholder={String(summary.expectedCash)}
                 />
                 {difference !== null && (
@@ -261,11 +264,16 @@ export function CajaClient({ register, summary, history, currencySign, paymentMe
                 )}
               </div>
               <div className="space-y-2">
-                <Label>Observaciones del cierre</Label>
+                <Label>
+                  Observaciones del cierre
+                  {difference !== null && Math.abs(difference) > 0.01 && (
+                    <span className="text-destructive ml-1">*</span>
+                  )}
+                </Label>
                 <Input
                   value={closeNotes}
                   onChange={(e) => setCloseNotes(e.target.value)}
-                  placeholder="Todo en orden, etc."
+                  placeholder={difference !== null && Math.abs(difference) > 0.01 ? 'Explica la diferencia...' : 'Todo en orden, etc.'}
                 />
               </div>
             </div>
@@ -291,16 +299,17 @@ export function CajaClient({ register, summary, history, currencySign, paymentMe
       {/* ── History ───────────────────────────────────────────────────────────── */}
       {history.length > 0 && (
         <Card className="p-5 space-y-3">
-          <button
-            className="flex items-center justify-between w-full font-semibold"
-            onClick={() => setShowHistory((v) => !v)}
-          >
-            <span className="flex items-center gap-2">
+          <div className="flex items-center justify-between">
+            <button
+              className="flex items-center gap-2 font-semibold"
+              onClick={() => setShowHistory((v) => !v)}
+            >
               <TrendingUp className="h-4 w-4" />
               Cierres anteriores
-            </span>
-            {showHistory ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-          </button>
+              {showHistory ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </button>
+            <a href="/informes/cierres" className="text-xs text-primary hover:underline">Ver todos →</a>
+          </div>
           {showHistory && (
             <div className="space-y-3 pt-2">
               {history.map((h) => {
