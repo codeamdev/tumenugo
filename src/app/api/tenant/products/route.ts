@@ -12,7 +12,7 @@ const createSchema = z.object({
   description: z.string().optional(),
   price: z.string().regex(/^\d+(\.\d{1,2})?$/),
   sku: z.string().optional(),
-  taxRateId: z.string().uuid().optional(),
+  taxRateId: z.string().uuid().nullish(),
   prepTimeMin: z.number().int().min(0).default(0),
   isAvailable: z.boolean().default(true),
   inStock: z.boolean().default(true),
