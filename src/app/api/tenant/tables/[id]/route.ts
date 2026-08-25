@@ -9,7 +9,7 @@ import { tables } from '@/lib/db/schema/tenant'
 const updateSchema = z.object({
   name: z.string().min(1).max(50).optional(),
   capacity: z.number().int().min(1).optional(),
-  zone: z.string().optional(),
+  isBar: z.boolean().optional(),
   status: z.enum(['available', 'occupied', 'reserved', 'cleaning']).optional(),
   posX: z.number().optional(),
   posY: z.number().optional(),
@@ -21,12 +21,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const tenant = await requireActiveTenant()
 
   try {
-    const data = updateSchema.parse(await req.json())
+    const { isBar, ...rest } = updateSchema.parse(await req.json())
+    const patch = isBar !== undefined ? { ...rest, zone: isBar ? 'Barra' : 'Salón' } : rest
     const [updated] = await withTenant(tenant.schemaName, async (db) =>
-      db.update(tables).set(data).where(eq(tables.id, params.id)).returning()
+      db.update(tables).set(patch).where(eq(tables.id, params.id)).returning()
     )
     if (!updated) return NextResponse.json({ error: 'No encontrado' }, { status: 404 })
-    return NextResponse.json({ data: updated })
+    return NextResponse.json({ data: { ...updated, isBar: updated.zone === 'Barra' } })
   } catch (err) {
     if (err instanceof z.ZodError) return NextResponse.json({ error: err.issues }, { status: 400 })
     return NextResponse.json({ error: 'Error interno' }, { status: 500 })

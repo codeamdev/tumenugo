@@ -116,7 +116,8 @@ const STATUS_CONFIG: Record<string, { label: string; badge: string; pulse?: bool
 
 function getOrderLabel(order: DBOrder, tables: Props['tables']): string {
   if (order.type === 'table') {
-    return tables.find((t) => t.id === order.tableId)?.name ?? 'Mesa'
+    const name = tables.find((t) => t.id === order.tableId)?.name
+    return name ? `Mesa ${name}` : 'Mesa'
   }
   if (order.type === 'bar') return 'Barra'
   return order.customerName ?? 'Domicilio'

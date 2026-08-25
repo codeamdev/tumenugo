@@ -17,7 +17,7 @@ export default function NuevaMesaPage() {
   const [form, setForm] = useState({
     name: '',
     capacity: 4,
-    zone: 'Salón',
+    isBar: false,
   })
 
   async function handleSubmit(e: React.FormEvent) {
@@ -60,21 +60,29 @@ export default function NuevaMesaPage() {
           <CardHeader><CardTitle>Datos de la mesa</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Nombre / número *</Label>
-              <Input id="name" placeholder="Mesa 1 / Terraza A" value={form.name}
+              <Label htmlFor="name">Código / Número *</Label>
+              <Input id="name" placeholder="Ej: 1, 2, 3B, A1..." value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} required />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="capacity">Capacidad (personas)</Label>
-                <Input id="capacity" type="number" min="1" value={form.capacity}
-                  onChange={(e) => setForm((f) => ({ ...f, capacity: Number(e.target.value) }))} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="zone">Zona / sección</Label>
-                <Input id="zone" placeholder="Salón, Terraza..." value={form.zone}
-                  onChange={(e) => setForm((f) => ({ ...f, zone: e.target.value }))} />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="capacity">Capacidad (personas)</Label>
+              <Input id="capacity" type="number" min="1" value={form.capacity}
+                onChange={(e) => setForm((f) => ({ ...f, capacity: Number(e.target.value) }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Tipo</Label>
+              <button
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, isBar: !f.isBar }))}
+                className={`inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-semibold border-2 transition-all ${
+                  form.isBar
+                    ? 'border-amber-400 bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-700'
+                    : 'border-slate-300 bg-slate-50 text-slate-500 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-400'
+                }`}
+              >
+                <span className={`h-2 w-2 rounded-full ${form.isBar ? 'bg-amber-500' : 'bg-slate-400'}`} />
+                {form.isBar ? 'Barra (siempre disponible)' : 'Mesa normal'}
+              </button>
             </div>
           </CardContent>
         </Card>

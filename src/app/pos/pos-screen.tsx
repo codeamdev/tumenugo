@@ -277,29 +277,29 @@ export function POSScreen({ categories, products, tables, userId, tenantName, cu
 
         {/* Tables picker (inline) */}
         {tablesPanelOpen && tables.length > 0 && (
-          <div className="border-b p-3 bg-muted/30 space-y-2">
-            {Array.from(new Set(tables.map((t) => t.zone))).map((zone) => (
-              <div key={zone}>
-                <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-1.5">{zone}</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {tables.filter((t) => t.zone === zone).map((table) => (
-                    <button
-                      key={table.id}
-                      onClick={() => quickCreateOrSelectTable(table)}
-                      className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-                        activeOrder?.origin.type === 'table' && activeOrder.origin.tableId === table.id
-                          ? 'border-primary bg-primary text-primary-foreground'
-                          : table.status === 'occupied'
-                          ? 'border-red-200 bg-red-50 text-red-600 dark:bg-red-950 dark:border-red-800 dark:text-red-400'
-                          : 'bg-background hover:border-primary hover:bg-primary/5'
-                      }`}
-                    >
-                      {table.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
+          <div className="border-b p-3 bg-muted/30">
+            <div className="flex flex-wrap gap-1.5">
+              {tables.map((table) => {
+                const isActive = activeOrder?.origin.type === 'table' && activeOrder.origin.tableId === table.id
+                const isOccupied = table.status === 'occupied' && !isActive
+                return (
+                  <button
+                    key={table.id}
+                    onClick={() => !isOccupied && quickCreateOrSelectTable(table)}
+                    disabled={isOccupied}
+                    className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                      isActive
+                        ? 'border-primary bg-primary text-primary-foreground'
+                        : isOccupied
+                        ? 'border-red-200 bg-red-50 text-red-400 cursor-not-allowed opacity-75 dark:bg-red-950 dark:border-red-800'
+                        : 'bg-background hover:border-primary hover:bg-primary/5'
+                    }`}
+                  >
+                    {table.name}
+                  </button>
+                )
+              })}
+            </div>
           </div>
         )}
         {/* Search */}

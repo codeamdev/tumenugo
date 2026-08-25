@@ -4,7 +4,6 @@ import { withTenant } from '@/lib/db/tenant-db'
 import { tables } from '@/lib/db/schema/tenant'
 import { eq } from 'drizzle-orm'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { TableFloorPlan } from './floor-plan'
 import Link from 'next/link'
 import { Plus } from 'lucide-react'
@@ -14,19 +13,24 @@ export const metadata: Metadata = { title: 'Mesas' }
 
 const STATUS_CONFIG = {
   available: { label: 'Disponible', color: 'bg-emerald-100 border-emerald-300 text-emerald-800' },
-  occupied: { label: 'Ocupada', color: 'bg-red-100 border-red-300 text-red-800' },
-  reserved: { label: 'Reservada', color: 'bg-amber-100 border-amber-300 text-amber-800' },
-  cleaning: { label: 'Limpieza', color: 'bg-blue-100 border-blue-300 text-blue-800' },
+  occupied:  { label: 'Ocupada',    color: 'bg-red-100 border-red-300 text-red-800' },
+  reserved:  { label: 'Reservada',  color: 'bg-amber-100 border-amber-300 text-amber-800' },
+  cleaning:  { label: 'Limpieza',   color: 'bg-blue-100 border-blue-300 text-blue-800' },
 }
 
 export default async function MesasPage() {
   const [session, tenant] = await Promise.all([requireTenantSession(), requireActiveTenant()])
 
-  const allTables = await withTenant(tenant.schemaName, async (db) =>
+  const rows = await withTenant(tenant.schemaName, async (db) =>
     db.select().from(tables).where(eq(tables.isActive, true))
   )
 
-  const zones = Array.from(new Set(allTables.map((t) => t.zone)))
+  const allTables = rows.map((t) => ({
+    ...t,
+    isBar: t.zone === 'Barra',
+    status: t.zone === 'Barra' ? 'available' : t.status,
+  }))
+
   const canEdit = session.role === 'admin'
 
   return (
@@ -56,16 +60,7 @@ export default async function MesasPage() {
         ))}
       </div>
 
-      {/* Plano por zona */}
-      {zones.map((zone) => (
-        <div key={zone} className="space-y-3">
-          <h2 className="text-lg font-semibold">{zone}</h2>
-          <TableFloorPlan
-            tables={allTables.filter((t) => t.zone === zone)}
-            canEdit={canEdit}
-          />
-        </div>
-      ))}
+      <TableFloorPlan tables={allTables} canEdit={canEdit} />
 
       {allTables.length === 0 && (
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-16 gap-3">
