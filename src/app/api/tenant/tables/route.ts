@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { eq, asc } from 'drizzle-orm'
+import { eq, asc, and, inArray } from 'drizzle-orm'
 import { requireTenantSession } from '@/lib/auth/session'
 import { requireActiveTenant } from '@/lib/tenant'
 import { withTenant } from '@/lib/db/tenant-db'
-import { tables } from '@/lib/db/schema/tenant'
+import { tables, orders } from '@/lib/db/schema/tenant'
 
 const createSchema = z.object({
   name: z.string().min(1).max(50),
@@ -18,16 +18,31 @@ export async function GET() {
   await requireTenantSession()
   const tenant = await requireActiveTenant()
 
-  const rows = await withTenant(tenant.schemaName, async (db) =>
-    db.select().from(tables).where(eq(tables.isActive, true)).orderBy(asc(tables.name))
-  )
+  const data = await withTenant(tenant.schemaName, async (db) => {
+    const rows = await db.select().from(tables).where(eq(tables.isActive, true)).orderBy(asc(tables.name))
+    if (rows.length === 0) return []
 
-  const data = rows.map((t) => ({
-    ...t,
-    isBar: t.zone === 'Barra',
-    // Bar tables always show as available regardless of stored status
-    status: t.zone === 'Barra' ? 'available' : t.status,
-  }))
+    // Compute which tables have active (unpaid) orders
+    const tableIds = rows.map((t) => t.id)
+    const activeOrders = await db
+      .select({ tableId: orders.tableId })
+      .from(orders)
+      .where(and(
+        inArray(orders.tableId, tableIds),
+        inArray(orders.status, ['new', 'sent', 'preparing', 'ready', 'delivered']),
+      ))
+    const occupiedIds = new Set(activeOrders.map((o) => o.tableId).filter(Boolean))
+
+    return rows.map((t) => ({
+      ...t,
+      isBar: t.zone === 'Barra',
+      status: t.zone === 'Barra'
+        ? 'available'
+        : occupiedIds.has(t.id)
+          ? 'occupied'
+          : t.status === 'occupied' ? 'available' : t.status,
+    }))
+  })
 
   return NextResponse.json({ data })
 }
