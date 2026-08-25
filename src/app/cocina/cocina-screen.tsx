@@ -47,7 +47,10 @@ function elapsedInfo(createdAt: string): { label: string; urgency: 'normal' | 'w
 }
 
 function getOrderLabel(order: KitchenOrder, tables: Props['tables']): string {
-  if (order.type === 'table') return tables.find((t) => t.id === order.tableId)?.name ?? 'Mesa'
+  if (order.type === 'table') {
+    const name = tables.find((t) => t.id === order.tableId)?.name
+    return name ? `Mesa ${name}` : 'Mesa'
+  }
   if (order.type === 'bar') return 'Barra'
   return order.customerName ?? 'Domicilio'
 }
