@@ -88,6 +88,7 @@ interface DBOrder {
   type: 'table' | 'bar' | 'delivery'
   status: string
   tableId?: string | null
+  tableName?: string | null
   customerName?: string | null
   customerPhone?: string | null
   subtotal: string
@@ -116,7 +117,7 @@ const STATUS_CONFIG: Record<string, { label: string; badge: string; pulse?: bool
 
 function getOrderLabel(order: DBOrder, tables: Props['tables']): string {
   if (order.type === 'table') {
-    const name = tables.find((t) => t.id === order.tableId)?.name
+    const name = order.tableName ?? tables.find((t) => t.id === order.tableId)?.name
     return name ? `Mesa ${name}` : 'Mesa'
   }
   if (order.type === 'bar') return 'Barra'
@@ -453,14 +454,11 @@ export function PedidosScreen({
       >
         {/* Top row */}
         <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <span className="text-muted-foreground">{getOriginIcon(order.type)}</span>
-            <div>
-              <span className="font-semibold text-base">{label}</span>
-              {order.displayCode && (
-                <span className="ml-2 text-xs font-mono text-muted-foreground">{order.displayCode}</span>
-              )}
-            </div>
+          <div className="flex flex-col gap-0.5">
+            <span className="font-bold text-xl leading-tight">{label}</span>
+            {order.displayCode && (
+              <span className="text-xs font-mono text-muted-foreground">{order.displayCode}</span>
+            )}
           </div>
           <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${cfg.badge} ${cfg.pulse ? 'animate-pulse' : ''}`}>
             {order.type === 'delivery' && order.status === 'delivered' ? 'Al domiciliario' : cfg.label}

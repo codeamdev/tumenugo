@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Separator } from '@/components/ui/separator'
 import { formatCurrency } from '@/lib/utils'
-import { Download, TrendingUp, ShoppingBag, AlertTriangle, Clock } from 'lucide-react'
+import { Download, TrendingUp, ShoppingBag, AlertTriangle, Clock, XCircle } from 'lucide-react'
 import {
   ResponsiveContainer,
   LineChart, Line,
@@ -25,6 +25,16 @@ interface PendingPayment {
   type: string
 }
 
+interface CancelledOrder {
+  id: string
+  displayCode: string | null
+  createdAt: string | null
+  total: number
+  customerName: string | null
+  type: string
+  tableName: string | null
+}
+
 interface ReportData {
   period: { from: string; to: string }
   currencySign: string
@@ -37,6 +47,8 @@ interface ReportData {
   byCategory: { name: string; emoji: string | null; revenue: number; qty: number }[]
   lowRotation: { name: string; qty: number }[]
   pendingPayments: PendingPayment[]
+  cancelledOrders: CancelledOrder[]
+  cancelledKpis: { count: number; totalLost: number }
 }
 
 function todayISO() {
@@ -341,6 +353,43 @@ export default function InformesPage() {
                     </p>
                   </div>
                   <span className="shrink-0 font-bold text-amber-700">{fmt(p.total)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+      </Card>
+      {/* Pedidos cancelados */}
+      <Card className="p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <XCircle className="h-4 w-4 text-red-500" />
+          <h2 className="font-semibold text-sm">Pedidos cancelados</h2>
+          {(data?.cancelledKpis.count ?? 0) > 0 && (
+            <span className="ml-auto text-sm font-semibold text-red-600">
+              {data!.cancelledKpis.count} pedido{data!.cancelledKpis.count !== 1 ? 's' : ''} · {fmt(data!.cancelledKpis.totalLost)} no cobrado{data!.cancelledKpis.count !== 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground">Pedidos anulados creados en el período seleccionado</p>
+        {loading
+          ? <Skeleton className="h-32 w-full" />
+          : (data?.cancelledOrders?.length ?? 0) === 0
+          ? <p className="text-sm text-muted-foreground py-8 text-center">Sin pedidos cancelados en el período 🎉</p>
+          : (
+            <div className="space-y-0 divide-y text-sm">
+              {data!.cancelledOrders.map((o) => (
+                <div key={o.id} className="flex items-start justify-between py-2.5 gap-3">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-red-700 dark:text-red-400">
+                      {o.displayCode ?? '#' + o.id.slice(-6).toUpperCase()}
+                      {o.tableName && <span className="ml-1.5 font-normal text-muted-foreground">· Mesa {o.tableName}</span>}
+                      {!o.tableName && o.type === 'delivery' && <span className="ml-1.5 font-normal text-muted-foreground">· Domicilio</span>}
+                    </p>
+                    {o.customerName && <p className="text-xs text-muted-foreground truncate">{o.customerName}</p>}
+                    <p className="text-xs text-muted-foreground">
+                      {o.createdAt ? new Date(o.createdAt).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}
+                    </p>
+                  </div>
+                  <span className="shrink-0 font-bold text-red-600 line-through">{fmt(o.total)}</span>
                 </div>
               ))}
             </div>

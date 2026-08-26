@@ -19,9 +19,13 @@ interface KitchenOrder {
   id: string
   displayCode?: string | null
   type: 'table' | 'bar' | 'delivery'
-  status: 'sent' | 'preparing'
+  status: 'sent' | 'preparing' | 'ready'
   tableId?: string | null
+  tableName?: string | null
   customerName?: string | null
+  customerPhone?: string | null
+  customerAddress?: string | null
+  customerNotes?: string | null
   notes?: string | null
   createdAt: string
   items: KitchenItem[]
@@ -82,6 +86,7 @@ function playBeep() {
 export function CocinaScreen({ tenantName, primaryColor, tables, userName, kitchenAlertMinutes }: Props) {
   const { toast } = useToast()
   const [orders, setOrders] = useState<KitchenOrder[]>([])
+  const [alertMinutes, setAlertMinutes] = useState(kitchenAlertMinutes || 20)
   const [refreshing, setRefreshing] = useState(false)
   const [time, setTime] = useState(new Date())
   const prevOrderIds = useRef<Set<string>>(new Set())
@@ -99,6 +104,7 @@ export function CocinaScreen({ tenantName, primaryColor, tables, userName, kitch
       if (!res.ok) return
       const json = await res.json()
       const newOrders: KitchenOrder[] = json.data ?? []
+      if (typeof json.alertMinutes === 'number') setAlertMinutes(json.alertMinutes)
 
       // Sound alert for new orders (skip first load)
       if (!isFirstLoad.current) {
@@ -134,8 +140,8 @@ export function CocinaScreen({ tenantName, primaryColor, tables, userName, kitch
         body: JSON.stringify({ status: newStatus }),
       })
       if (!res.ok) throw new Error()
-      // Remove from list when marked ready
-      if (newStatus === 'ready') {
+      // Remove from list when delivered
+      if (newStatus === 'delivered') {
         setOrders((prev) => prev.filter((o) => o.id !== orderId))
       }
     } catch {
@@ -149,8 +155,9 @@ export function CocinaScreen({ tenantName, primaryColor, tables, userName, kitch
     window.location.href = '/login'
   }
 
-  const sentOrders = orders.filter((o) => o.status === 'sent')
+  const sentOrders      = orders.filter((o) => o.status === 'sent')
   const preparingOrders = orders.filter((o) => o.status === 'preparing')
+  const readyOrders     = orders.filter((o) => o.status === 'ready')
 
   const timeStr = time.toLocaleTimeString('es-CO', {
     hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true,
@@ -161,8 +168,9 @@ export function CocinaScreen({ tenantName, primaryColor, tables, userName, kitch
   function OrderCard(order: KitchenOrder) {
     const { label: timeLabel, urgency } = elapsedInfo(order.createdAt)
     const isPreparing = order.status === 'preparing'
+    const isReady     = order.status === 'ready'
     const elapsedMin = Math.floor((Date.now() - new Date(order.createdAt).getTime()) / 60000)
-    const isLate = (order.status === 'sent' || isPreparing) && kitchenAlertMinutes > 0 && elapsedMin >= kitchenAlertMinutes
+    const isLate = (order.status === 'sent' || isPreparing) && alertMinutes > 0 && elapsedMin >= alertMinutes
 
     const urgencyClass =
       urgency === 'urgent' ? 'text-red-600 dark:text-red-400' :
@@ -171,9 +179,11 @@ export function CocinaScreen({ tenantName, primaryColor, tables, userName, kitch
 
     const borderClass = isLate
       ? 'border-red-500 dark:border-red-600'
-      : isPreparing
-        ? 'border-orange-500 dark:border-orange-600'
-        : 'border-blue-500 dark:border-blue-600'
+      : isReady
+        ? 'border-emerald-500 dark:border-emerald-600'
+        : isPreparing
+          ? 'border-orange-500 dark:border-orange-600'
+          : 'border-blue-500 dark:border-blue-600'
 
     return (
       <div
@@ -197,8 +207,17 @@ export function CocinaScreen({ tenantName, primaryColor, tables, userName, kitch
               <span className="text-2xl font-black tracking-tight">
                 {order.displayCode ?? `#${order.id.slice(-6).toUpperCase()}`}
               </span>
+              <p className="text-base font-bold leading-none mt-1">
+                {getOrderLabel(order, tables)}
+              </p>
               {order.type === 'delivery' && order.customerName && (
                 <p className="text-xs text-muted-foreground leading-none mt-0.5">{order.customerName}</p>
+              )}
+              {order.type === 'delivery' && order.customerPhone && (
+                <p className="text-xs text-muted-foreground leading-none mt-0.5">📞 {order.customerPhone}</p>
+              )}
+              {order.type === 'delivery' && order.customerAddress && (
+                <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 leading-snug mt-0.5">📍 {order.customerAddress}</p>
               )}
             </div>
           </div>
@@ -232,30 +251,51 @@ export function CocinaScreen({ tenantName, primaryColor, tables, userName, kitch
           ))}
         </div>
 
-        {/* Order-level notes */}
-        {order.notes && (
-          <div className="rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 px-3 py-2">
-            <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wide mb-0.5">
-              Observaciones del pedido
-            </p>
-            <p className="text-sm text-amber-800 dark:text-amber-300">{order.notes}</p>
+        {/* Order-level notes / customer notes */}
+        {(order.notes || order.customerNotes) && (
+          <div className="rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 px-3 py-2 space-y-1">
+            {order.notes && (
+              <>
+                <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wide">
+                  Observaciones del pedido
+                </p>
+                <p className="text-sm text-amber-800 dark:text-amber-300">{order.notes}</p>
+              </>
+            )}
+            {order.customerNotes && (
+              <>
+                <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wide">
+                  Nota del cliente
+                </p>
+                <p className="text-sm text-amber-800 dark:text-amber-300">{order.customerNotes}</p>
+              </>
+            )}
           </div>
         )}
 
         {/* Action */}
-        {!isPreparing ? (
+        {order.status === 'sent' && (
           <Button
             className="w-full h-12 text-base font-bold bg-amber-500 hover:bg-amber-600 text-white border-0"
             onClick={() => changeStatus(order.id, 'preparing')}
           >
             Preparando
           </Button>
-        ) : (
+        )}
+        {isPreparing && (
           <Button
             className="w-full h-12 text-base font-bold bg-emerald-600 hover:bg-emerald-700 text-white border-0"
             onClick={() => changeStatus(order.id, 'ready')}
           >
             ✓ Listo
+          </Button>
+        )}
+        {isReady && (
+          <Button
+            className="w-full h-12 text-base font-bold bg-indigo-500 hover:bg-indigo-600 text-white border-0"
+            onClick={() => changeStatus(order.id, 'delivered')}
+          >
+            🚲 Entregado
           </Button>
         )}
       </div>
@@ -308,9 +348,9 @@ export function CocinaScreen({ tenantName, primaryColor, tables, userName, kitch
         </div>
       )}
 
-      {/* Two-column KDS */}
+      {/* Three-column KDS */}
       {orders.length > 0 && (
-        <div className="flex-1 overflow-hidden grid grid-cols-1 md:grid-cols-2 md:divide-x">
+        <div className="flex-1 overflow-hidden grid grid-cols-1 md:grid-cols-3 md:divide-x">
           {/* En espera (sent) */}
           <div className="flex flex-col overflow-hidden">
             <div className="bg-blue-600 text-white px-4 py-2.5 flex items-center justify-between shrink-0">
@@ -341,6 +381,23 @@ export function CocinaScreen({ tenantName, primaryColor, tables, userName, kitch
                 <p className="text-center text-muted-foreground text-sm py-12">Sin pedidos en preparación</p>
               ) : (
                 preparingOrders.map((o) => OrderCard(o))
+              )}
+            </div>
+          </div>
+
+          {/* Listos */}
+          <div className="flex flex-col overflow-hidden border-t md:border-t-0">
+            <div className="bg-emerald-600 text-white px-4 py-2.5 flex items-center justify-between shrink-0">
+              <span className="font-bold tracking-wide uppercase text-sm">Listos</span>
+              <span className="bg-white/20 text-white text-xs font-bold px-2.5 py-0.5 rounded-full">
+                {readyOrders.length}
+              </span>
+            </div>
+            <div className="flex-1 overflow-y-auto p-3 space-y-3">
+              {readyOrders.length === 0 ? (
+                <p className="text-center text-muted-foreground text-sm py-12">Sin pedidos listos</p>
+              ) : (
+                readyOrders.map((o) => OrderCard(o))
               )}
             </div>
           </div>

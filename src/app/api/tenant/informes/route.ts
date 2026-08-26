@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireTenantSession } from '@/lib/auth/session'
 import { requireActiveTenant } from '@/lib/tenant'
 import { withTenant } from '@/lib/db/tenant-db'
-import { orders, orderItems, products, categories, cashRegisterEntries } from '@/lib/db/schema/tenant'
+import { orders, orderItems, products, categories, cashRegisterEntries, tables } from '@/lib/db/schema/tenant'
 import { and, eq, gte, lte, inArray, sql } from 'drizzle-orm'
 
 import { buildMethodLabels } from '@/lib/payment-methods'
@@ -81,6 +81,27 @@ export async function GET(req: NextRequest) {
         )
       )
       .orderBy(orders.closedAt)
+
+    // Pedidos cancelados en el período
+    const cancelledOrders = await db
+      .select()
+      .from(orders)
+      .where(
+        and(
+          eq(orders.status, 'cancelled'),
+          gte(orders.createdAt, from),
+          lte(orders.createdAt, to)
+        )
+      )
+      .orderBy(orders.createdAt)
+
+    // Resolver nombres de mesa para cancelados
+    const cancelledTableIds = Array.from(new Set(cancelledOrders.map((o) => o.tableId).filter(Boolean) as string[]))
+    let cancelledTableMap: Record<string, string> = {}
+    if (cancelledTableIds.length > 0) {
+      const tableRows = await db.select({ id: tables.id, name: tables.name }).from(tables).where(inArray(tables.id, cancelledTableIds))
+      cancelledTableMap = Object.fromEntries(tableRows.map((t) => [t.id, t.name]))
+    }
 
     // Cuentas por cobrar: todos los pedidos cerrados con pago pendiente (fiado), sin filtro de fecha
     const pendingPayments = await db
@@ -258,6 +279,19 @@ export async function GET(req: NextRequest) {
         paymentNotes: o.paymentNotes ?? '',
         type: o.type,
       })),
+      cancelledOrders: cancelledOrders.map((o) => ({
+        id: o.id,
+        displayCode: o.displayCode,
+        createdAt: o.createdAt?.toISOString() ?? null,
+        total: parseFloat(o.total ?? '0'),
+        customerName: o.customerName ?? null,
+        type: o.type,
+        tableName: o.tableId ? (cancelledTableMap[o.tableId] ?? null) : null,
+      })),
+      cancelledKpis: {
+        count: cancelledOrders.length,
+        totalLost: cancelledOrders.reduce((s, o) => s + parseFloat(o.total ?? '0'), 0),
+      },
     }
   })
 

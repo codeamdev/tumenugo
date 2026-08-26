@@ -8,12 +8,14 @@ import { orders, orderItems, tables } from '@/lib/db/schema/tenant'
 export async function GET(_: NextRequest) {
   await requireTenantSession()
   const tenant = await requireActiveTenant()
+  const posConfig = tenant.posConfig as { kitchenAlertMinutes?: number } | null
+  const alertMinutes = posConfig?.kitchenAlertMinutes ?? 20
 
   const data = await withTenant(tenant.schemaName, async (db) => {
     const activeOrders = await db
       .select()
       .from(orders)
-      .where(inArray(orders.status, ['sent', 'preparing'] as any))
+      .where(inArray(orders.status, ['sent', 'preparing', 'ready'] as any))
       .orderBy(asc(orders.createdAt))
 
     if (activeOrders.length === 0) return []
@@ -44,5 +46,5 @@ export async function GET(_: NextRequest) {
     }))
   })
 
-  return NextResponse.json({ data })
+  return NextResponse.json({ data, alertMinutes })
 }
