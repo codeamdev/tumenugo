@@ -303,3 +303,23 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     return NextResponse.json({ error: apiError(err) }, { status: 500 })
   }
 }
+
+export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
+  const session = await requireTenantSession()
+  if (session.role !== 'admin') {
+    return NextResponse.json({ error: 'Solo el administrador puede eliminar pedidos' }, { status: 403 })
+  }
+  const tenant = await requireActiveTenant()
+
+  await withTenant(tenant.schemaName, async (db) => {
+    const [order] = await db.select().from(orders).where(eq(orders.id, params.id)).limit(1)
+    if (!order) return
+    await db.delete(orderItems).where(eq(orderItems.orderId, params.id))
+    await db.delete(orders).where(eq(orders.id, params.id))
+    if (order.tableId) {
+      await db.update(tables).set({ status: 'available' }).where(eq(tables.id, order.tableId))
+    }
+  })
+
+  return NextResponse.json({ ok: true })
+}
