@@ -96,6 +96,7 @@ interface DBOrder {
   taxBreakdown: { name: string; rate: number; amount: number }[]
   deliveryFee: string
   total: string
+  notes?: string | null
   createdAt: string
   itemsCount?: number
   items?: DBOrderItem[]
@@ -158,6 +159,29 @@ export function PedidosScreen({
 
   // â”€â”€ Detail state (DB order)
   const [detailOrder, setDetailOrder] = useState<DBOrder | null>(null)
+
+  // â”€â”€ Notes editing
+  const [notesDraft, setNotesDraft] = useState('')
+  const [savingNotes, setSavingNotes] = useState(false)
+
+  useEffect(() => {
+    setNotesDraft(detailOrder?.notes ?? '')
+  }, [detailOrder?.id])
+
+  async function saveNotes() {
+    if (!detailOrder) return
+    setSavingNotes(true)
+    try {
+      const res = await fetch(`/api/tenant/orders/${detailOrder.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notes: notesDraft }),
+      })
+      if (!res.ok) { toast({ title: 'Error', description: 'No se pudo guardar', variant: 'destructive' }); return }
+      setDetailOrder((prev) => prev ? { ...prev, notes: notesDraft } : prev)
+      toast({ title: 'Nota guardada' })
+    } finally { setSavingNotes(false) }
+  }
 
   // â”€â”€ Pay modal state
   const [showPayModal, setShowPayModal] = useState(false)
@@ -666,6 +690,33 @@ export function PedidosScreen({
               {detailOrder.customerName && <p><span className="text-muted-foreground">Cliente:</span> {detailOrder.customerName}</p>}
               {detailOrder.customerPhone && <p><span className="text-muted-foreground">Tel:</span> {detailOrder.customerPhone}</p>}
             </div>
+          )}
+
+          {/* Notes */}
+          {!['closed', 'cancelled'].includes(detailOrder.status) && (
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground uppercase font-semibold tracking-wide">Notas del pedido</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={notesDraft}
+                  onChange={(e) => setNotesDraft(e.target.value)}
+                  placeholder="Sin notas"
+                  className="flex-1"
+                  onKeyDown={(e) => e.key === 'Enter' && saveNotes()}
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={saveNotes}
+                  disabled={savingNotes || notesDraft === (detailOrder.notes ?? '')}
+                >
+                  {savingNotes ? '...' : 'Guardar'}
+                </Button>
+              </div>
+            </div>
+          )}
+          {['closed', 'cancelled'].includes(detailOrder.status) && detailOrder.notes && (
+            <p className="text-sm text-muted-foreground italic">"{detailOrder.notes}"</p>
           )}
 
           {/* Items */}
