@@ -15,7 +15,7 @@ Next.js app que sirve como frontend web y API backend para el sistema POS multi-
 - Dexie + IndexedDB (offline web), Serwist (PWA — solo producción)
 - React Hook Form + Zod (formularios)
 - ExcelJS + PDFKit (exports), @anthropic-ai/sdk (parse PDF menú)
-- PM2 + Docker + Nginx (despliegue)
+- PM2 + Nginx (despliegue — **NO Docker** para tumenugo)
 - Gestor de paquetes: **npm**
 
 ## Comandos
@@ -158,6 +158,29 @@ nginx/               nginx.conf, nginx.prod.conf
 - Componentes `src/components/ui/` son shadcn/ui generados — no editar directamente; crear wrappers.
 
 **Path alias**: `@/` → `src/`.
+
+## Deploy a producción
+
+El servidor usa **PM2** (no Docker) para correr el web. El flujo correcto:
+
+```bash
+# 1. Local: commit + push
+git add <archivos>
+git commit -m "mensaje"
+git push origin master
+
+# 2. Servidor: pull + build + pm2 restart (via deploy.sh)
+ssh -i ~/.ssh/codeamdev root@2.25.145.148 "bash /srv/tumenugo/deploy.sh"
+```
+
+El script `deploy.sh` hace: `git pull → npm install → npm run build → copia standalone → pm2 restart tumenugo`.
+
+**NUNCA usar `docker compose`** para el deploy de tumenugo — no existe `docker-compose.phase1.yml` en el servidor. La app corre como proceso Node standalone gestionado por PM2 en el puerto 4821.
+
+Para verificar que está corriendo:
+```bash
+ssh -i ~/.ssh/codeamdev root@2.25.145.148 "pm2 list"
+```
 
 ## Reglas / cosas a evitar
 

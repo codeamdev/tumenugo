@@ -21,7 +21,8 @@ const openSchema = z.object({
 
 const closeSchema = z.object({
   action: z.literal('close'),
-  countedCash: z.number().min(0),
+  countedByMethod: z.record(z.number().min(0)).optional(),
+  countedCash: z.number().min(0).optional(),
   notes: z.string().optional(),
 })
 
@@ -208,15 +209,13 @@ export async function POST(req: NextRequest) {
           .filter((o) => o.paymentMethod === 'cash')
           .reduce((s, o) => s + parseFloat(o.total ?? '0'), 0)
 
-        const expectedCash =
-          parseFloat(register.openingAmount ?? '0') + cashSales
+        const expectedCash = parseFloat(register.openingAmount ?? '0') + cashSales
 
-        const difference = input.countedCash - expectedCash
+        const countedCashVal = input.countedByMethod
+          ? (input.countedByMethod['cash'] ?? 0)
+          : (input.countedCash ?? 0)
 
-        // Observation is required when there is a cash difference
-        if (Math.abs(difference) > 0.01 && !input.notes?.trim()) {
-          throw new Error('Observación requerida cuando hay diferencia en el arqueo')
-        }
+        const difference = countedCashVal - expectedCash
 
         const [closed] = await db
           .update(cashRegisters)
@@ -224,8 +223,9 @@ export async function POST(req: NextRequest) {
             closedBy: session.sub,
             closedAt: new Date(),
             expectedCash: String(expectedCash),
-            countedCash: String(input.countedCash),
+            countedCash: String(countedCashVal),
             difference: String(difference),
+            countedByMethod: input.countedByMethod ?? null,
             notes: input.notes ?? register.notes,
             status: 'closed',
           })
@@ -241,7 +241,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Acción inválida' }, { status: 400 })
   } catch (err) {
     if (err instanceof z.ZodError) return NextResponse.json({ error: err.issues }, { status: 400 })
-    if (err instanceof Error && (err.message.includes('Ya hay') || err.message.includes('No hay') || err.message.includes('Hay ') || err.message.includes('Observación requerida'))) {
+    if (err instanceof Error && (err.message.includes('Ya hay') || err.message.includes('No hay') || err.message.includes('Hay '))) {
       return NextResponse.json({ error: err.message }, { status: 409 })
     }
     console.error('Caja error:', err)

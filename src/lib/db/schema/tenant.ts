@@ -253,6 +253,7 @@ export const cashRegisters = pgTable('cash_registers', {
   expectedCash: numeric('expected_cash', { precision: 12, scale: 2 }),
   countedCash: numeric('counted_cash', { precision: 12, scale: 2 }),
   difference: numeric('difference', { precision: 12, scale: 2 }),
+  countedByMethod: jsonb('counted_by_method').$type<Record<string, number>>(),
   notes: text('notes'),
   status: registerStatusEnum('status').notNull().default('open'),
 })

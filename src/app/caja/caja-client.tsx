@@ -51,16 +51,12 @@ export function CajaClient({ register, summary, history, currencySign, paymentMe
 
   const [openingAmount, setOpeningAmount] = useState(defaultOpeningAmount > 0 ? String(defaultOpeningAmount) : '')
   const [openNotes, setOpenNotes] = useState('')
-  const [countedCash, setCountedCash] = useState('')
+  const [countedByMethod, setCountedByMethod] = useState<Record<string, string>>({})
   const [closeNotes, setCloseNotes] = useState('')
   const [loading, setLoading] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
 
   const fmt = (n: number) => formatCurrency(n, currencySign)
-
-  const difference = summary && countedCash
-    ? round2(parseFloat(countedCash) - summary.expectedCash)
-    : null
 
   async function handleOpen() {
     setLoading(true)
@@ -87,19 +83,25 @@ export function CajaClient({ register, summary, history, currencySign, paymentMe
   }
 
   async function handleClose() {
-    if (!countedCash) return
-    if (difference !== null && Math.abs(difference) > 0.01 && !closeNotes.trim()) {
-      toast({ title: 'Observación requerida', description: 'Debes ingresar una observación cuando hay diferencia en el arqueo.', variant: 'destructive' })
-      return
-    }
+    if (!summary || !countedByMethod['cash']) return
     setLoading(true)
     try {
+      const methodsToShow = [
+        'cash',
+        ...Object.entries(summary.byPaymentMethod)
+          .filter(([k, v]) => k !== 'cash' && v > 0)
+          .map(([k]) => k),
+      ]
+      const countedByMethodNums: Record<string, number> = {}
+      for (const m of methodsToShow) {
+        countedByMethodNums[m] = parseFloat(countedByMethod[m] ?? '0') || 0
+      }
       const res = await fetch('/api/tenant/caja', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'close',
-          countedCash: parseFloat(countedCash),
+          countedByMethod: countedByMethodNums,
           notes: closeNotes || undefined,
         }),
       })
@@ -234,59 +236,84 @@ export function CajaClient({ register, summary, history, currencySign, paymentMe
               <Lock className="h-4 w-4" />
               Cierre de caja / Arqueo
             </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Efectivo contado en caja ({currencySign})</Label>
-                <Input
-                  type="text"
-                  inputMode="numeric"
-                  value={countedCash ? parseInt(countedCash, 10).toLocaleString('es-CO') : ''}
-                  onChange={(e) => setCountedCash(e.target.value.replace(/\D/g, ''))}
-                  placeholder={String(summary.expectedCash)}
-                />
-                {difference !== null && (
-                  <div className={`flex items-center gap-1.5 text-sm font-medium ${
-                    difference === 0
-                      ? 'text-emerald-600'
-                      : difference > 0
-                      ? 'text-blue-600'
-                      : 'text-destructive'
-                  }`}>
-                    {difference === 0
-                      ? <CheckCircle className="h-4 w-4" />
-                      : <AlertTriangle className="h-4 w-4" />}
-                    {difference === 0
-                      ? 'Cuadra perfectamente'
-                      : difference > 0
-                      ? `Sobrante: ${fmt(difference)}`
-                      : `Faltante: ${fmt(Math.abs(difference))}`}
+
+            <div className="space-y-3">
+              {/* Efectivo */}
+              {(() => {
+                const cashExpected = parseFloat(register.openingAmount ?? '0') + (summary.byPaymentMethod['cash'] ?? 0)
+                const rawCash = countedByMethod['cash'] ?? ''
+                const cashCounted = rawCash !== '' ? parseFloat(rawCash) : null
+                const cashDiff = cashCounted !== null ? round2(cashCounted - cashExpected) : null
+                return (
+                  <div className="rounded-lg border p-3 space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="font-medium">Efectivo</span>
+                      <span className="text-sm text-muted-foreground">Esperado: {fmt(cashExpected)}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Base {fmt(parseFloat(register.openingAmount ?? '0'))} + Ventas {fmt(summary.byPaymentMethod['cash'] ?? 0)}
+                    </p>
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      value={rawCash ? parseInt(rawCash, 10).toLocaleString('es-CO') : ''}
+                      onChange={(e) => setCountedByMethod((prev) => ({ ...prev, cash: e.target.value.replace(/\D/g, '') }))}
+                      placeholder={String(cashExpected)}
+                    />
+                    {cashDiff !== null && (
+                      <div className={`flex items-center gap-1.5 text-sm font-medium ${cashDiff === 0 ? 'text-emerald-600' : cashDiff > 0 ? 'text-blue-600' : 'text-destructive'}`}>
+                        {cashDiff === 0 ? <CheckCircle className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+                        {cashDiff === 0 ? 'Cuadra perfectamente' : cashDiff > 0 ? `Sobrante: ${fmt(cashDiff)}` : `Faltante: ${fmt(Math.abs(cashDiff))}`}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label>
-                  Observaciones del cierre
-                  {difference !== null && Math.abs(difference) > 0.01 && (
-                    <span className="text-destructive ml-1">*</span>
-                  )}
-                </Label>
-                <Input
-                  value={closeNotes}
-                  onChange={(e) => setCloseNotes(e.target.value)}
-                  placeholder={difference !== null && Math.abs(difference) > 0.01 ? 'Explica la diferencia...' : 'Todo en orden, etc.'}
-                />
-              </div>
+                )
+              })()}
+
+              {/* Otros métodos */}
+              {Object.entries(summary.byPaymentMethod)
+                .filter(([k, v]) => k !== 'cash' && v > 0)
+                .map(([method, expectedVal]) => {
+                  const rawVal = countedByMethod[method] ?? ''
+                  const counted = rawVal !== '' ? parseFloat(rawVal) : null
+                  const diff = counted !== null ? round2(counted - expectedVal) : null
+                  return (
+                    <div key={method} className="rounded-lg border p-3 space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="font-medium">{paymentMethodLabels[method] ?? method}</span>
+                        <span className="text-sm text-muted-foreground">Esperado: {fmt(expectedVal)}</span>
+                      </div>
+                      <Input
+                        type="text"
+                        inputMode="numeric"
+                        value={rawVal ? parseInt(rawVal, 10).toLocaleString('es-CO') : ''}
+                        onChange={(e) => setCountedByMethod((prev) => ({ ...prev, [method]: e.target.value.replace(/\D/g, '') }))}
+                        placeholder={String(expectedVal)}
+                      />
+                      {diff !== null && (
+                        <div className={`flex items-center gap-1.5 text-sm font-medium ${diff === 0 ? 'text-emerald-600' : diff > 0 ? 'text-blue-600' : 'text-destructive'}`}>
+                          {diff === 0 ? <CheckCircle className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+                          {diff === 0 ? 'Cuadra perfectamente' : diff > 0 ? `Sobrante: ${fmt(diff)}` : `Faltante: ${fmt(Math.abs(diff))}`}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
             </div>
-            {difference !== null && difference < 0 && (
-              <Alert variant="destructive">
-                <AlertTriangle className="h-4 w-4" />
-                <span>Hay un faltante de {fmt(Math.abs(difference))}. Verifique el conteo antes de cerrar.</span>
-              </Alert>
-            )}
+
+            <div className="space-y-2">
+              <Label>Observaciones del cierre (opcional)</Label>
+              <Input
+                value={closeNotes}
+                onChange={(e) => setCloseNotes(e.target.value)}
+                placeholder="Todo en orden, etc."
+              />
+            </div>
+
             <Button
               variant="destructive"
               onClick={handleClose}
-              disabled={!countedCash || loading}
+              disabled={!countedByMethod['cash'] || loading}
               loading={loading}
             >
               <Lock className="h-4 w-4 mr-2" />
