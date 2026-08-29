@@ -626,7 +626,7 @@ export function PedidosScreen({
     const taxLines = detailOrder.taxBreakdown ?? []
     const isReady = detailOrder.status === 'ready'
     const isDelivered = detailOrder.status === 'delivered'
-    const canPay = !['closed', 'cancelled'].includes(detailOrder.status)
+    const canPay = ['ready', 'delivered'].includes(detailOrder.status)
 
     return (
       <div className="flex flex-col h-full">
