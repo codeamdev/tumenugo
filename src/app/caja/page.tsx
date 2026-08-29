@@ -56,8 +56,7 @@ export default async function CajaPage() {
         }
       }
 
-      const cashSales = byMethod['cash'] ?? 0
-      const expectedCash = parseFloat(register.openingAmount ?? '0') + cashSales
+      const expectedCash = byMethod['cash'] ?? 0
 
       summary = {
         totalOrders: closedOrders.length,
@@ -65,6 +64,7 @@ export default async function CajaPage() {
         totalTips,
         byPaymentMethod: byMethod,
         expectedCash,
+        openingAmount: parseFloat(register.openingAmount ?? '0'),
       }
     }
 

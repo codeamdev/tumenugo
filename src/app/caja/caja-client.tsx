@@ -34,6 +34,7 @@ interface Summary {
   totalTips: number
   byPaymentMethod: Record<string, number>
   expectedCash: number
+  openingAmount: number
 }
 
 interface Props {
