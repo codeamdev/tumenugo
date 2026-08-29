@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/components/ui/use-toast'
 import { ModifiersModal } from '@/app/pos/modifiers-modal'
 import {
-  Plus, Trash2, Search, UtensilsCrossed, Truck, BarChart3,
+  Plus, Trash2, Search, UtensilsCrossed, Truck, BarChart3, ShoppingBag,
   ChevronLeft, RefreshCw, LogOut, Clock, CheckCircle2, Minus,
 } from 'lucide-react'
 import type { PaymentMethodConfig } from '@/lib/payment-methods'
@@ -85,7 +85,7 @@ interface DBOrderItem {
 interface DBOrder {
   id: string
   displayCode?: string | null
-  type: 'table' | 'bar' | 'delivery'
+  type: 'table' | 'bar' | 'delivery' | 'takeout'
   status: string
   tableId?: string | null
   tableName?: string | null
@@ -122,12 +122,14 @@ function getOrderLabel(order: DBOrder, tables: Props['tables']): string {
     return name ? `Mesa ${name}` : 'Mesa'
   }
   if (order.type === 'bar') return 'Barra'
+  if (order.type === 'takeout') return 'Para llevar'
   return order.customerName ?? 'Domicilio'
 }
 
 function getOriginIcon(type: string) {
   if (type === 'table') return <UtensilsCrossed className="h-4 w-4" />
   if (type === 'bar') return <BarChart3 className="h-4 w-4" />
+  if (type === 'takeout') return <ShoppingBag className="h-4 w-4" />
   return <Truck className="h-4 w-4" />
 }
 

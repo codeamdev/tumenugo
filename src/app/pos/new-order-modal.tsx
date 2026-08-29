@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { UtensilsCrossed, BarChart3, Truck } from 'lucide-react'
+import { UtensilsCrossed, BarChart3, Truck, ShoppingBag } from 'lucide-react'
 import type { OrderOrigin } from './pos-store'
 
 interface DeliveryFields {
@@ -24,12 +24,12 @@ interface Props {
   onCreate: (origin: OrderOrigin) => void
   deliveryFields?: DeliveryFields
   defaultDeliveryFee?: number
-  defaultTab?: 'table' | 'bar' | 'delivery'
+  defaultTab?: 'table' | 'bar' | 'delivery' | 'takeout'
 }
 
 export function NewOrderModal({ tables, onClose, onCreate, deliveryFields, defaultDeliveryFee = 0, defaultTab = 'table' }: Props) {
   const df = deliveryFields ?? { phone: true, address: true, notes: true, fee: true }
-  const [tab, setTab] = useState<'table' | 'bar' | 'delivery'>(defaultTab)
+  const [tab, setTab] = useState<'table' | 'bar' | 'delivery' | 'takeout'>(defaultTab)
   const [selectedTable, setSelectedTable] = useState<{ id: string; name: string } | null>(null)
   const [delivery, setDelivery] = useState({
     customerName: '',
@@ -45,6 +45,8 @@ export function NewOrderModal({ tables, onClose, onCreate, deliveryFields, defau
       onCreate({ type: 'table', tableId: selectedTable.id, tableName: selectedTable.name })
     } else if (tab === 'bar') {
       onCreate({ type: 'bar' })
+    } else if (tab === 'takeout') {
+      onCreate({ type: 'takeout' })
     } else {
       onCreate({ type: 'delivery', ...delivery })
     }
@@ -53,6 +55,7 @@ export function NewOrderModal({ tables, onClose, onCreate, deliveryFields, defau
   const isValid =
     tab === 'table' ? !!selectedTable :
     tab === 'bar' ? true :
+    tab === 'takeout' ? true :
     !!delivery.customerName
 
   const zones = Array.from(new Set(tables.map((t) => t.zone)))
@@ -73,6 +76,10 @@ export function NewOrderModal({ tables, onClose, onCreate, deliveryFields, defau
             <TabsTrigger value="bar" className="flex-1">
               <BarChart3 className="h-4 w-4 mr-1.5" />
               Barra
+            </TabsTrigger>
+            <TabsTrigger value="takeout" className="flex-1">
+              <ShoppingBag className="h-4 w-4 mr-1.5" />
+              Para llevar
             </TabsTrigger>
             <TabsTrigger value="delivery" className="flex-1">
               <Truck className="h-4 w-4 mr-1.5" />
@@ -114,6 +121,13 @@ export function NewOrderModal({ tables, onClose, onCreate, deliveryFields, defau
             <div className="rounded-lg border border-dashed p-8 text-center">
               <BarChart3 className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
               <p className="text-sm text-muted-foreground">Pedido para consumir en barra</p>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="takeout" className="mt-4">
+            <div className="rounded-lg border border-dashed p-8 text-center">
+              <ShoppingBag className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+              <p className="text-sm text-muted-foreground">El cliente recoge el pedido en el local</p>
             </div>
           </TabsContent>
 

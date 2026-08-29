@@ -10,6 +10,7 @@ import { calcOrderTotals, type CalcItem, type OrderTotals } from '@/lib/order-ca
 export type OrderOrigin =
   | { type: 'table'; tableId: string; tableName: string }
   | { type: 'bar' }
+  | { type: 'takeout' }
   | { type: 'delivery'; customerName: string; customerPhone: string; customerAddress: string; customerNotes: string; deliveryFee: number }
 
 export interface ActiveOrder {

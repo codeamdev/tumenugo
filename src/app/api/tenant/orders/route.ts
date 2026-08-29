@@ -22,7 +22,7 @@ const itemSchema = z.object({
 })
 
 const createSchema = z.object({
-  type: z.enum(['table', 'bar', 'delivery']),
+  type: z.enum(['table', 'bar', 'delivery', 'takeout']),
   tableId: z.string().uuid().optional(),
   customerName: z.string().optional(),
   customerPhone: z.string().optional(),

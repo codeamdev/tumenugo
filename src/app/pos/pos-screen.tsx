@@ -15,7 +15,7 @@ import { CloseOrderModal } from './close-order-modal'
 import { useToast } from '@/components/ui/use-toast'
 import {
   Plus, Minus, Trash2, ShoppingCart, Search,
-  UtensilsCrossed, Truck, BarChart3, ChevronLeft,
+  UtensilsCrossed, Truck, BarChart3, ShoppingBag, ChevronLeft,
 } from 'lucide-react'
 import { OfflineIndicator } from '@/components/offline-indicator'
 import type { PaymentMethodConfig } from '@/lib/payment-methods'
@@ -169,12 +169,14 @@ export function POSScreen({ categories, products, tables, userId, tenantName, cu
   function originLabel(origin: OrderOrigin) {
     if (origin.type === 'table') return origin.tableName ?? 'Mesa'
     if (origin.type === 'bar') return 'Barra'
+    if (origin.type === 'takeout') return 'Para llevar'
     return `Domicilio — ${origin.customerName}`
   }
 
   function originIcon(origin: OrderOrigin) {
     if (origin.type === 'table') return <UtensilsCrossed className="h-3 w-3" />
     if (origin.type === 'delivery') return <Truck className="h-3 w-3" />
+    if (origin.type === 'takeout') return <ShoppingBag className="h-3 w-3" />
     return <BarChart3 className="h-3 w-3" />
   }
 

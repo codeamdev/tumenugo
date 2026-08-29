@@ -29,7 +29,7 @@ export const tableStatusEnum = pgEnum('table_status', [
 
 export const selectionTypeEnum = pgEnum('selection_type', ['single', 'multiple'])
 
-export const orderTypeEnum = pgEnum('order_type', ['table', 'bar', 'delivery'])
+export const orderTypeEnum = pgEnum('order_type', ['table', 'bar', 'delivery', 'takeout'])
 
 export const orderStatusEnum = pgEnum('order_status', [
   'new',
