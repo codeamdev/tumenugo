@@ -106,7 +106,8 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const expectedCash = parseFloat(register.openingAmount ?? '0') + (byMethod['cash'] ?? 0)
+    // expectedCash = solo ventas en efectivo (base excluida de métricas)
+    const expectedCash = byMethod['cash'] ?? 0
 
     return {
       register: serialise(register),
@@ -116,6 +117,7 @@ export async function GET(req: NextRequest) {
         totalTips,
         byPaymentMethod: byMethod,
         expectedCash,
+        openingAmount: parseFloat(register.openingAmount ?? '0'),
       },
       history: history.map(serialise),
     }
@@ -209,7 +211,8 @@ export async function POST(req: NextRequest) {
           .filter((o) => o.paymentMethod === 'cash')
           .reduce((s, o) => s + parseFloat(o.total ?? '0'), 0)
 
-        const expectedCash = parseFloat(register.openingAmount ?? '0') + cashSales
+        // expectedCash = ventas en efectivo únicamente (base no es ingreso)
+        const expectedCash = cashSales
 
         const countedCashVal = input.countedByMethod
           ? (input.countedByMethod['cash'] ?? 0)

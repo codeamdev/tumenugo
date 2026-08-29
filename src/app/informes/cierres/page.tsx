@@ -77,8 +77,7 @@ export default function CierresPage() {
             const diff = h.difference ? parseFloat(h.difference) : null
             const hasDiff = diff !== null && Math.abs(diff) > 0.01
             const base = parseFloat(h.openingAmount ?? '0')
-            const expected = h.expectedCash ? parseFloat(h.expectedCash) : null
-            const cashSales = expected !== null ? expected - base : null
+            const cashSales = h.expectedCash ? parseFloat(h.expectedCash) : null
             const otherMethods = h.countedByMethod
               ? Object.entries(h.countedByMethod).filter(([k]) => k !== 'cash')
               : []
@@ -106,24 +105,20 @@ export default function CierresPage() {
                 {/* Efectivo */}
                 <div className="rounded-md bg-muted/40 px-3 py-2 space-y-1">
                   <p className="text-xs font-semibold text-muted-foreground uppercase">Efectivo</p>
-                  <div className="grid grid-cols-4 gap-2 text-sm">
+                  <div className="grid grid-cols-3 gap-2 text-sm">
                     <div className="space-y-0.5">
-                      <p className="text-xs text-muted-foreground">Base (apertura)</p>
-                      <p className="font-semibold">{fmt(base)}</p>
-                    </div>
-                    <div className="space-y-0.5">
-                      <p className="text-xs text-muted-foreground">Ventas ef.</p>
+                      <p className="text-xs text-muted-foreground">Ventas ef. esperadas</p>
                       <p className="font-semibold">{cashSales !== null ? fmt(cashSales) : '—'}</p>
                     </div>
                     <div className="space-y-0.5">
-                      <p className="text-xs text-muted-foreground">Esperado (con base)</p>
-                      <p className="font-semibold">{expected !== null ? fmt(expected) : '—'}</p>
-                    </div>
-                    <div className="space-y-0.5">
-                      <p className="text-xs text-muted-foreground">Contado</p>
+                      <p className="text-xs text-muted-foreground">Contado (sin fondo)</p>
                       <p className={`font-semibold ${hasDiff ? (diff! > 0 ? 'text-blue-600' : 'text-destructive') : 'text-emerald-600'}`}>
                         {h.countedCash ? fmt(parseFloat(h.countedCash)) : '—'}
                       </p>
+                    </div>
+                    <div className="space-y-0.5">
+                      <p className="text-xs text-muted-foreground">Fondo inicial</p>
+                      <p className="font-semibold text-muted-foreground">{fmt(base)}</p>
                     </div>
                   </div>
                 </div>

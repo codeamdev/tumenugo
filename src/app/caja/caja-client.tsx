@@ -195,8 +195,8 @@ export function CajaClient({ register, summary, history, currencySign, paymentMe
               <p className="text-2xl font-bold text-emerald-600">{fmt(summary.totalTips)}</p>
             </Card>
             <Card className="p-4 space-y-1">
-              <p className="text-xs text-muted-foreground uppercase font-medium">Efectivo esperado</p>
-              <p className="text-2xl font-bold">{fmt(summary.expectedCash)}</p>
+              <p className="text-xs text-muted-foreground uppercase font-medium">Ventas efectivo</p>
+              <p className="text-2xl font-bold">{fmt(summary.byPaymentMethod['cash'] ?? 0)}</p>
             </Card>
           </div>
 
@@ -212,20 +212,18 @@ export function CajaClient({ register, summary, history, currencySign, paymentMe
               )}
               {Object.entries(summary.byPaymentMethod).map(([method, amount]) => (
                 <div key={method} className="flex justify-between items-center">
-                  <span className="text-sm">
-                    {paymentMethodLabels[method] ?? method}
-                  </span>
+                  <span className="text-sm">{paymentMethodLabels[method] ?? method}</span>
                   <span className="font-medium">{fmt(amount)}</span>
                 </div>
               ))}
               <Separator />
-              <div className="flex justify-between items-center font-bold">
-                <span>Fondo inicial</span>
-                <span>{fmt(parseFloat(register.openingAmount ?? '0'))}</span>
-              </div>
               <div className="flex justify-between items-center font-bold text-lg">
-                <span>Efectivo esperado en caja</span>
-                <span>{fmt(summary.expectedCash)}</span>
+                <span>Total ventas</span>
+                <span>{fmt(summary.totalSales)}</span>
+              </div>
+              <div className="flex justify-between items-center text-sm text-muted-foreground">
+                <span>Fondo inicial (no es venta)</span>
+                <span>{fmt(parseFloat(register.openingAmount ?? '0'))}</span>
               </div>
             </div>
           </Card>
@@ -240,7 +238,7 @@ export function CajaClient({ register, summary, history, currencySign, paymentMe
             <div className="space-y-3">
               {/* Efectivo */}
               {(() => {
-                const cashExpected = parseFloat(register.openingAmount ?? '0') + (summary.byPaymentMethod['cash'] ?? 0)
+                const cashExpected = summary.byPaymentMethod['cash'] ?? 0
                 const rawCash = countedByMethod['cash'] ?? ''
                 const cashCounted = rawCash !== '' ? parseFloat(rawCash) : null
                 const cashDiff = cashCounted !== null ? round2(cashCounted - cashExpected) : null
@@ -250,9 +248,11 @@ export function CajaClient({ register, summary, history, currencySign, paymentMe
                       <span className="font-medium">Efectivo</span>
                       <span className="text-sm text-muted-foreground">Esperado: {fmt(cashExpected)}</span>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      Base {fmt(parseFloat(register.openingAmount ?? '0'))} + Ventas {fmt(summary.byPaymentMethod['cash'] ?? 0)}
-                    </p>
+                    {parseFloat(register.openingAmount ?? '0') > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        Fondo inicial {fmt(parseFloat(register.openingAmount ?? '0'))} — no incluir en el conteo
+                      </p>
+                    )}
                     <Input
                       type="text"
                       inputMode="numeric"
