@@ -19,12 +19,14 @@ function localDateStr(): string {
 
 function startOfDay(dateStr: string): Date {
   const [y, m, d] = dateStr.split('-').map(Number)
-  return new Date(y, m - 1, d, 0, 0, 0, 0)
+  // Colombia = UTC-5; midnight COT = 05:00 UTC
+  return new Date(Date.UTC(y, m - 1, d, 5, 0, 0, 0))
 }
 
 function endOfDay(dateStr: string): Date {
   const [y, m, d] = dateStr.split('-').map(Number)
-  return new Date(y, m - 1, d, 23, 59, 59, 999)
+  // 23:59:59 COT = next calendar day 04:59:59 UTC
+  return new Date(Date.UTC(y, m - 1, d + 1, 4, 59, 59, 999))
 }
 
 export async function GET(req: NextRequest) {
@@ -49,6 +51,9 @@ export async function GET(req: NextRequest) {
       )
     )
   )
+
+  const paidOrders = closedOrders.filter((o) => o.paymentStatus === 'paid')
+  const fiadoOrders = closedOrders.filter((o) => o.paymentStatus !== 'paid')
 
   const methodLabels = buildMethodLabels(tenant.posConfig as PosConfig | null)
   const wb = new ExcelJS.Workbook()
@@ -90,14 +95,14 @@ export async function GET(req: NextRequest) {
     })
   }
 
-  // Totals row
+  // Totals row — solo pedidos cobrados (excluye fiado)
   const lastRow = closedOrders.length + 2
   const totalsRow = ws.getRow(lastRow)
-  totalsRow.getCell('closedAt').value = 'TOTALES'
-  totalsRow.getCell('subtotal').value = closedOrders.reduce((s, o) => s + parseFloat(o.subtotal ?? '0'), 0)
-  totalsRow.getCell('taxAmount').value = closedOrders.reduce((s, o) => s + parseFloat(o.taxAmount ?? '0'), 0)
-  totalsRow.getCell('tipAmount').value = closedOrders.reduce((s, o) => s + parseFloat(o.tipAmount ?? '0'), 0)
-  totalsRow.getCell('total').value = closedOrders.reduce((s, o) => s + parseFloat(o.total ?? '0'), 0)
+  totalsRow.getCell('closedAt').value = 'TOTALES (cobrados)'
+  totalsRow.getCell('subtotal').value = paidOrders.reduce((s, o) => s + parseFloat(o.subtotal ?? '0'), 0)
+  totalsRow.getCell('taxAmount').value = paidOrders.reduce((s, o) => s + parseFloat(o.taxAmount ?? '0'), 0)
+  totalsRow.getCell('tipAmount').value = paidOrders.reduce((s, o) => s + parseFloat(o.tipAmount ?? '0'), 0)
+  totalsRow.getCell('total').value = paidOrders.reduce((s, o) => s + parseFloat(o.total ?? '0'), 0)
   totalsRow.font = { bold: true }
 
   // ── Sheet 2: Resumen ─────────────────────────────────────────────────────────
@@ -105,11 +110,13 @@ export async function GET(req: NextRequest) {
   ws2.addRow(['Métrica', 'Valor'])
   ws2.getRow(1).font = { bold: true }
   ws2.addRow(['Período', `${from.toLocaleDateString('es-CO')} – ${to.toLocaleDateString('es-CO')}`])
-  ws2.addRow(['Total pedidos', closedOrders.length])
-  ws2.addRow(['Ventas totales', closedOrders.reduce((s, o) => s + parseFloat(o.total ?? '0'), 0)])
-  ws2.addRow(['Ticket promedio', closedOrders.length > 0
-    ? closedOrders.reduce((s, o) => s + parseFloat(o.total ?? '0'), 0) / closedOrders.length : 0])
-  ws2.addRow(['Total propinas', closedOrders.reduce((s, o) => s + parseFloat(o.tipAmount ?? '0'), 0)])
+  ws2.addRow(['Total pedidos cobrados', paidOrders.length])
+  ws2.addRow(['Ventas cobradas', paidOrders.reduce((s, o) => s + parseFloat(o.total ?? '0'), 0)])
+  ws2.addRow(['Ticket promedio', paidOrders.length > 0
+    ? paidOrders.reduce((s, o) => s + parseFloat(o.total ?? '0'), 0) / paidOrders.length : 0])
+  ws2.addRow(['Total propinas', paidOrders.reduce((s, o) => s + parseFloat(o.tipAmount ?? '0'), 0)])
+  ws2.addRow(['Cuentas por cobrar (fiado)', fiadoOrders.length])
+  ws2.addRow(['Monto fiado pendiente', fiadoOrders.reduce((s, o) => s + parseFloat(o.total ?? '0'), 0)])
   ws2.columns = [{ key: 'a', width: 24 }, { key: 'b', width: 20 }]
 
   const buf = await wb.xlsx.writeBuffer()
