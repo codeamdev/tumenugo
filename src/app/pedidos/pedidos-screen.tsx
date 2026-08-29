@@ -109,7 +109,7 @@ const STATUS_CONFIG: Record<string, { label: string; badge: string; pulse?: bool
   new:       { label: 'Nuevo',          badge: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300' },
   sent:      { label: 'En cocina',      badge: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' },
   preparing: { label: 'Preparando',     badge: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300', pulse: true },
-  ready:     { label: 'Listo âœ“',        badge: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300', pulse: true },
+  ready:     { label: 'Listo ✓',          badge: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300', pulse: true },
   delivered: { label: 'Entregado',      badge: 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300' },
   closed:    { label: 'Finalizado',     badge: 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400' },
   cancelled: { label: 'Anulado',        badge: 'bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400' },
@@ -320,7 +320,7 @@ export function PedidosScreen({
       })
       if (!res.ok) throw new Error()
       const label = getOrderLabel(payingOrder, tables)
-      toast({ variant: 'success', title: `${label} â€” pago registrado`, description: 'Cobrado' })
+      toast({ variant: 'success', title: `${label} — pago registrado`, description: 'Cobrado' })
       setShowPayModal(false)
       setPayingOrder(null)
       if (view === 'detail') setView('list')
@@ -496,7 +496,7 @@ export function PedidosScreen({
                 className="flex-1 border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950"
                 onClick={() => changeStatus(order.id, 'ready')}
               >
-                Listo âœ“
+                Listo ✓
               </Button>
             </>
           )}
@@ -509,7 +509,7 @@ export function PedidosScreen({
               className="flex-1 border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950"
               onClick={() => changeStatus(order.id, 'ready')}
             >
-              Marcar listo âœ“
+              Marcar listo ✓
             </Button>
           )}
 
@@ -681,7 +681,7 @@ export function PedidosScreen({
                   <div key={item.id} className={`p-3 flex items-start justify-between gap-3 ${isCancelled ? 'opacity-50' : ''}`}>
                     <div className="flex-1 min-w-0">
                       <p className={`font-medium text-sm ${isCancelled ? 'line-through text-muted-foreground' : ''}`}>
-                        <span className="text-muted-foreground mr-1.5">{item.quantity}Ã—</span>
+                        <span className="text-muted-foreground mr-1.5">{item.quantity}×</span>
                         {item.productSnapshot?.name}
                       </p>
                       {(item.modifierSnapshot ?? []).length > 0 && (
@@ -931,12 +931,12 @@ export function PedidosScreen({
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1.5">
-              <Label>DescripciÃ³n *</Label>
+              <Label>Descripción *</Label>
               <Input
                 autoFocus
                 value={addCustomForm.name}
                 onChange={(e) => setAddCustomForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="Ej: Sopa del dÃ­a"
+                placeholder="Ej: Sopa del día"
               />
             </div>
             <div className="space-y-1.5">
@@ -985,7 +985,7 @@ export function PedidosScreen({
       <Dialog open={showPayModal} onOpenChange={(open) => { if (!open) { setShowPayModal(false); setPayingOrder(null) } }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Cobrar â€” {label}</DialogTitle>
+            <DialogTitle>Cobrar — {label}</DialogTitle>
           </DialogHeader>
 
           {/* Order summary */}
@@ -1057,9 +1057,9 @@ export function PedidosScreen({
             </button>
           </div>
 
-          {/* Montos rÃ¡pidos */}
+          {/* Montos rápidos */}
           <div className="space-y-1.5">
-            <Label>Monto rÃ¡pido</Label>
+            <Label>Monto rápido</Label>
             <div className="flex flex-wrap gap-2">
               {[10000, 20000, 50000, 100000].map((amt) => (
                 <button
@@ -1100,12 +1100,12 @@ export function PedidosScreen({
             )}
             {payChange === 0 && payRemaining === 0 && totalReceived > 0 && (
               <div className="flex justify-between font-semibold text-emerald-600">
-                <span>Cuadra exacto</span><span>âœ“</span>
+                <span>Cuadra exacto</span><span>✓</span>
               </div>
             )}
           </div>
 
-          {/* Nombre del cliente â€” obligatorio para crÃ©dito */}
+          {/* Nombre del cliente — obligatorio para crédito */}
           {isPayCredit && (
             <div className="space-y-1.5">
               <Label>Nombre del cliente <span className="text-destructive">*</span></Label>

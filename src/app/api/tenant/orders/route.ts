@@ -159,13 +159,18 @@ export async function POST(request: NextRequest) {
       })
 
       // Generate daily consecutive display code: PED-001 or DOM-001
+      // Uses MAX (not COUNT) so deleted orders never cause duplicate codes.
+      // Day boundaries in Colombia time (UTC-5, no DST).
       const prefix = input.type === 'delivery' ? 'DOM' : input.type === 'bar' ? 'BAR' : 'PED'
-      const todayStart = new Date()
-      todayStart.setHours(0, 0, 0, 0)
-      const todayEnd = new Date()
-      todayEnd.setHours(23, 59, 59, 999)
-      const [countRow] = await db
-        .select({ n: sql<number>`count(*)::int` })
+      const nowUtc = new Date()
+      const colombiaOffsetMs = 5 * 3600 * 1000 // UTC-5
+      const nowColombia = new Date(nowUtc.getTime() - colombiaOffsetMs)
+      const ymd = nowColombia.toISOString().slice(0, 10) // YYYY-MM-DD in Colombia
+      const [y, mo, d] = ymd.split('-').map(Number)
+      const todayStart = new Date(Date.UTC(y, mo - 1, d, 0, 0, 0, 0) + colombiaOffsetMs) // Colombia midnight → UTC
+      const todayEnd   = new Date(todayStart.getTime() + 86_400_000 - 1)
+      const [maxRow] = await db
+        .select({ maxNum: sql<number>`COALESCE(MAX(CAST(SPLIT_PART(display_code, '-', 2) AS INTEGER)), 0)` })
         .from(orders)
         .where(
           and(
@@ -174,7 +179,7 @@ export async function POST(request: NextRequest) {
             lt(orders.createdAt, todayEnd),
           )
         )
-      const nextNum = (countRow?.n ?? 0) + 1
+      const nextNum = (maxRow?.maxNum ?? 0) + 1
       const displayCode = `${prefix}-${String(nextNum).padStart(3, '0')}`
 
       // Create order
