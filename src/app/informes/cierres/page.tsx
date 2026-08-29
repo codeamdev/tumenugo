@@ -14,6 +14,7 @@ interface CashRegister {
   expectedCash: string | null
   countedCash: string | null
   difference: string | null
+  countedByMethod: Record<string, number> | null
   notes: string | null
   status: string
 }
@@ -21,6 +22,7 @@ interface CashRegister {
 export default function CierresPage() {
   const [history, setHistory] = useState<CashRegister[]>([])
   const [currencySign, setCurrencySign] = useState('$')
+  const [methodLabels, setMethodLabels] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -30,6 +32,7 @@ export default function CierresPage() {
       .then((json) => {
         setHistory(json.data?.history ?? [])
         setCurrencySign(json.data?.currencySign ?? '$')
+        setMethodLabels(json.data?.paymentMethodLabels ?? {})
       })
       .catch(() => setError('No se pudo cargar el historial'))
       .finally(() => setLoading(false))
@@ -73,6 +76,12 @@ export default function CierresPage() {
           {history.map((h) => {
             const diff = h.difference ? parseFloat(h.difference) : null
             const hasDiff = diff !== null && Math.abs(diff) > 0.01
+            const base = parseFloat(h.openingAmount ?? '0')
+            const expected = h.expectedCash ? parseFloat(h.expectedCash) : null
+            const cashSales = expected !== null ? expected - base : null
+            const otherMethods = h.countedByMethod
+              ? Object.entries(h.countedByMethod).filter(([k]) => k !== 'cash')
+              : []
             return (
               <Card key={h.id} className="p-4 space-y-3">
                 <div className="flex items-center justify-between">
@@ -83,6 +92,9 @@ export default function CierresPage() {
                     <span className="font-semibold text-sm">
                       {h.closedAt ? formatDateTime(h.closedAt) : '—'}
                     </span>
+                    <span className="text-xs text-muted-foreground">
+                      Turno: {h.openedAt ? formatDateTime(h.openedAt) : '—'} → {h.closedAt ? formatDateTime(h.closedAt) : '—'}
+                    </span>
                   </div>
                   {diff !== null && (
                     <Badge variant={hasDiff ? (diff > 0 ? 'default' : 'destructive') : 'success'}>
@@ -90,20 +102,47 @@ export default function CierresPage() {
                     </Badge>
                   )}
                 </div>
-                <div className="grid grid-cols-3 gap-3 text-sm">
-                  <div className="space-y-0.5">
-                    <p className="text-xs text-muted-foreground uppercase font-medium">Apertura</p>
-                    <p className="font-semibold">{fmt(parseFloat(h.openingAmount ?? '0'))}</p>
-                  </div>
-                  <div className="space-y-0.5">
-                    <p className="text-xs text-muted-foreground uppercase font-medium">Esperado</p>
-                    <p className="font-semibold">{h.expectedCash ? fmt(parseFloat(h.expectedCash)) : '—'}</p>
-                  </div>
-                  <div className="space-y-0.5">
-                    <p className="text-xs text-muted-foreground uppercase font-medium">Contado</p>
-                    <p className="font-semibold">{h.countedCash ? fmt(parseFloat(h.countedCash)) : '—'}</p>
+
+                {/* Efectivo */}
+                <div className="rounded-md bg-muted/40 px-3 py-2 space-y-1">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase">Efectivo</p>
+                  <div className="grid grid-cols-4 gap-2 text-sm">
+                    <div className="space-y-0.5">
+                      <p className="text-xs text-muted-foreground">Base (apertura)</p>
+                      <p className="font-semibold">{fmt(base)}</p>
+                    </div>
+                    <div className="space-y-0.5">
+                      <p className="text-xs text-muted-foreground">Ventas ef.</p>
+                      <p className="font-semibold">{cashSales !== null ? fmt(cashSales) : '—'}</p>
+                    </div>
+                    <div className="space-y-0.5">
+                      <p className="text-xs text-muted-foreground">Esperado (con base)</p>
+                      <p className="font-semibold">{expected !== null ? fmt(expected) : '—'}</p>
+                    </div>
+                    <div className="space-y-0.5">
+                      <p className="text-xs text-muted-foreground">Contado</p>
+                      <p className={`font-semibold ${hasDiff ? (diff! > 0 ? 'text-blue-600' : 'text-destructive') : 'text-emerald-600'}`}>
+                        {h.countedCash ? fmt(parseFloat(h.countedCash)) : '—'}
+                      </p>
+                    </div>
                   </div>
                 </div>
+
+                {/* Otros métodos contados */}
+                {otherMethods.length > 0 && (
+                  <div className="rounded-md bg-muted/40 px-3 py-2 space-y-1">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase">Otros métodos</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-sm">
+                      {otherMethods.map(([method, counted]) => (
+                        <div key={method} className="space-y-0.5">
+                          <p className="text-xs text-muted-foreground">{methodLabels[method] ?? method}</p>
+                          <p className="font-semibold">{fmt(counted)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {h.notes && (
                   <p className="text-xs text-muted-foreground italic border-t pt-2">{h.notes}</p>
                 )}
