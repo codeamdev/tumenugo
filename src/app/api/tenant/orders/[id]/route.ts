@@ -155,13 +155,18 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
         // Crédito NO genera entrada de caja (no hay dinero recibido)
         if (openRegister && !isCredit) {
+          let remainingTotal = total
           for (const payment of validPayments) {
             const dbMethod = toDbMethod(payment.method)
+            // Cap each payment at remaining total so entries always sum to order total
+            const effectiveAmount = Math.min(payment.amount, remainingTotal)
+            remainingTotal -= effectiveAmount
+            if (effectiveAmount <= 0) continue
             await db.insert(cashRegisterEntries).values({
               registerId: openRegister.id,
               orderId: updated.id,
               type: 'sale',
-              amount: String(payment.amount),
+              amount: String(effectiveAmount),
               paymentMethod: dbMethod,
               notes: payment.method !== dbMethod ? payment.method : closeData.paymentNotes,
             })

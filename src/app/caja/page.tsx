@@ -40,16 +40,29 @@ export default async function CajaPage() {
           .from(cashRegisterEntries)
           .where(and(inArray(cashRegisterEntries.orderId, orderIds), eq(cashRegisterEntries.type, 'sale')))
 
-        const orderIdsWithEntries = new Set<string>()
-        for (const entry of entries) {
-          orderIdsWithEntries.add(entry.orderId!)
-          const isCustomKey = entry.paymentMethod === 'other' && entry.notes && methodLabels[entry.notes] !== undefined
-          const key = isCustomKey ? entry.notes! : (entry.paymentMethod ?? 'other')
-          byMethod[key] = (byMethod[key] ?? 0) + parseFloat(entry.amount ?? '0')
+        // Group by order and scale to order total to avoid overpayment inflation
+        const entriesByOrder: Record<string, typeof entries> = {}
+        for (const e of entries) {
+          if (!entriesByOrder[e.orderId!]) entriesByOrder[e.orderId!] = []
+          entriesByOrder[e.orderId!].push(e)
+        }
+        const withEntries = new Set<string>()
+        for (const o of closedOrders) {
+          const orderEntries = entriesByOrder[o.id]
+          if (!orderEntries?.length) continue
+          withEntries.add(o.id)
+          const orderTotal = parseFloat(o.total ?? '0')
+          const rawTotal   = orderEntries.reduce((s, e) => s + parseFloat(e.amount ?? '0'), 0)
+          for (const e of orderEntries) {
+            const isCustomKey = e.paymentMethod === 'other' && e.notes && methodLabels[e.notes] !== undefined
+            const key   = isCustomKey ? e.notes! : (e.paymentMethod ?? 'other')
+            const ratio = rawTotal > 0 ? parseFloat(e.amount ?? '0') / rawTotal : 1 / orderEntries.length
+            byMethod[key] = (byMethod[key] ?? 0) + orderTotal * ratio
+          }
         }
         // Fallback for older orders without cashRegisterEntries
         for (const o of closedOrders) {
-          if (!orderIdsWithEntries.has(o.id)) {
+          if (!withEntries.has(o.id)) {
             const m = o.paymentMethod ?? 'other'
             byMethod[m] = (byMethod[m] ?? 0) + parseFloat(o.total ?? '0')
           }
