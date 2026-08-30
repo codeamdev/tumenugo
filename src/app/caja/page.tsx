@@ -69,6 +69,8 @@ export default async function CajaPage() {
         }
       }
 
+      for (const k of Object.keys(byMethod)) byMethod[k] = Math.round(byMethod[k])
+
       const expectedCash = byMethod['cash'] ?? 0
 
       summary = {

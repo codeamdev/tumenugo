@@ -106,6 +106,8 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    for (const k of Object.keys(byMethod)) byMethod[k] = Math.round(byMethod[k])
+
     // expectedCash = solo ventas en efectivo (base excluida de métricas)
     const expectedCash = byMethod['cash'] ?? 0
 
