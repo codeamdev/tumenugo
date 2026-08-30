@@ -697,7 +697,7 @@ export function PedidosScreen({
                     return (
                       <div
                         key={o.id}
-                        onClick={() => { setDetailOrder(o); setView('detail') }}
+                        onClick={() => openDetail(o.id)}
                         className="flex items-center gap-3 p-3 rounded-xl border bg-card hover:bg-muted/50 cursor-pointer transition-colors"
                       >
                         <span className="text-muted-foreground">{getOriginIcon(o.type)}</span>
