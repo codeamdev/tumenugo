@@ -40,7 +40,8 @@ export default async function CajaPage() {
           .from(cashRegisterEntries)
           .where(and(inArray(cashRegisterEntries.orderId, orderIds), eq(cashRegisterEntries.type, 'sale')))
 
-        // Group by order and scale to order total to avoid overpayment inflation
+        // Group by order; cap each entry to remaining total (small amounts first)
+        // so overpayment in cash never inflates the totals.
         const entriesByOrder: Record<string, typeof entries> = {}
         for (const e of entries) {
           if (!entriesByOrder[e.orderId!]) entriesByOrder[e.orderId!] = []
@@ -52,12 +53,14 @@ export default async function CajaPage() {
           if (!orderEntries?.length) continue
           withEntries.add(o.id)
           const orderTotal = parseFloat(o.total ?? '0')
-          const rawTotal   = orderEntries.reduce((s, e) => s + parseFloat(e.amount ?? '0'), 0)
-          for (const e of orderEntries) {
+          let remaining = orderTotal
+          const sorted = [...orderEntries].sort((a, b) => parseFloat(a.amount ?? '0') - parseFloat(b.amount ?? '0'))
+          for (const e of sorted) {
             const isCustomKey = e.paymentMethod === 'other' && e.notes && methodLabels[e.notes] !== undefined
-            const key   = isCustomKey ? e.notes! : (e.paymentMethod ?? 'other')
-            const ratio = rawTotal > 0 ? parseFloat(e.amount ?? '0') / rawTotal : 1 / orderEntries.length
-            byMethod[key] = (byMethod[key] ?? 0) + orderTotal * ratio
+            const key = isCustomKey ? e.notes! : (e.paymentMethod ?? 'other')
+            const capped = Math.min(parseFloat(e.amount ?? '0'), remaining)
+            remaining -= capped
+            if (capped > 0) byMethod[key] = (byMethod[key] ?? 0) + capped
           }
         }
         // Fallback for older orders without cashRegisterEntries
@@ -68,8 +71,6 @@ export default async function CajaPage() {
           }
         }
       }
-
-      for (const k of Object.keys(byMethod)) byMethod[k] = Math.round(byMethod[k])
 
       const expectedCash = byMethod['cash'] ?? 0
 
