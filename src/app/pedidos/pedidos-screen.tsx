@@ -16,7 +16,7 @@ import {
 } from 'lucide-react'
 import type { PaymentMethodConfig } from '@/lib/payment-methods'
 
-// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ Types â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 interface ProductWithModifiers {
   id: string
@@ -98,13 +98,16 @@ interface DBOrder {
   total: string
   notes?: string | null
   createdAt: string
+  closedAt?: string | null
+  paymentMethod?: string | null
   itemsCount?: number
   items?: DBOrderItem[]
 }
 
-type View = 'list' | 'detail'
+type View = 'list' | 'historial' | 'detail'
+type ListTab = 'activos' | 'historial'
 
-// â”€â”€â”€ Status config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ Status config â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 const STATUS_CONFIG: Record<string, { label: string; badge: string; pulse?: boolean }> = {
   new:       { label: 'Nuevo',          badge: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300' },
@@ -141,7 +144,7 @@ function elapsedLabel(createdAt: string): string {
 }
 
 
-// â”€â”€â”€ Main component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ Main component â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 export function PedidosScreen({
   categories, products, tables, userId,
@@ -151,18 +154,21 @@ export function PedidosScreen({
   const { toast } = useToast()
   const fmt = (n: number) => formatCurrency(n, currencySign)
 
-  // â”€â”€ View state
+  // â"€â"€ View state
   const [view, setView] = useState<View>('list')
+  const [listTab, setListTab] = useState<ListTab>('activos')
   const [dbOrders, setDbOrders] = useState<DBOrder[]>([])
+  const [historialOrders, setHistorialOrders] = useState<DBOrder[]>([])
   const [refreshing, setRefreshing] = useState(false)
+  const [loadingHistorial, setLoadingHistorial] = useState(false)
 
-  // â”€â”€ Modifiers modal (for add-to-order)
+  // â"€â"€ Modifiers modal (for add-to-order)
   const [modifiersProduct, setModifiersProduct] = useState<ProductWithModifiers | null>(null)
 
-  // â”€â”€ Detail state (DB order)
+  // â"€â"€ Detail state (DB order)
   const [detailOrder, setDetailOrder] = useState<DBOrder | null>(null)
 
-  // â”€â”€ Notes editing
+  // â"€â"€ Notes editing
   const [notesDraft, setNotesDraft] = useState('')
   const [savingNotes, setSavingNotes] = useState(false)
 
@@ -185,7 +191,7 @@ export function PedidosScreen({
     } finally { setSavingNotes(false) }
   }
 
-  // â”€â”€ Pay modal state
+  // â"€â"€ Pay modal state
   const [showPayModal, setShowPayModal] = useState(false)
   const [payingOrder, setPayingOrder] = useState<DBOrder | null>(null)
   const [payLines, setPayLines] = useState<{ method: string; amount: string }[]>([])
@@ -193,7 +199,7 @@ export function PedidosScreen({
   const [payCustomerName, setPayCustomerName] = useState('')
   const [paying, setPaying] = useState(false)
 
-  // â”€â”€ Add-to-order state
+  // â"€â"€ Add-to-order state
   const [showAddToOrder, setShowAddToOrder] = useState(false)
   const [addToOrderItems, setAddToOrderItems] = useState<LocalItem[]>([])
   const [addSearch, setAddSearch] = useState('')
@@ -202,7 +208,7 @@ export function PedidosScreen({
   const [addCustomForm, setAddCustomForm] = useState({ name: '', price: '' })
   const [submittingAdd, setSubmittingAdd] = useState(false)
 
-  // â”€â”€ Fetch orders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€ Fetch orders â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
   const fetchOrders = useCallback(async () => {
     try {
@@ -225,7 +231,21 @@ export function PedidosScreen({
     setRefreshing(false)
   }
 
-  // â”€â”€ Grouped orders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const fetchHistorial = useCallback(async () => {
+    setLoadingHistorial(true)
+    try {
+      const res = await fetch('/api/tenant/orders?historial=true')
+      if (!res.ok) return
+      const json = await res.json()
+      setHistorialOrders(json.data ?? [])
+    } catch { /* silent */ } finally { setLoadingHistorial(false) }
+  }, [])
+
+  useEffect(() => {
+    if (listTab === 'historial') fetchHistorial()
+  }, [listTab, fetchHistorial])
+
+  // â"€â"€ Grouped orders â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
   const readyOrders = useMemo(() => dbOrders.filter((o) => o.status === 'ready'), [dbOrders])
   const inProgressOrders = useMemo(
@@ -234,7 +254,7 @@ export function PedidosScreen({
   )
   const deliveredOrders = useMemo(() => dbOrders.filter((o) => o.status === 'delivered'), [dbOrders])
 
-  // â”€â”€ Add-to-order catalog filter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€ Add-to-order catalog filter â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
   const addFilteredProducts = useMemo(() => {
     let list = products
@@ -248,7 +268,7 @@ export function PedidosScreen({
     0,
   )
 
-  // â”€â”€ Actions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€ Actions â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
   async function markDelivered(orderId: string) {
     const found = dbOrders.find((o) => o.id === orderId)
@@ -416,7 +436,7 @@ export function PedidosScreen({
   // aliases
   const orders = dbOrders
 
-  // â”€â”€ Pay modal totals â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€ Pay modal totals â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
   const paySubtotal = parseFloat(payingOrder?.subtotal ?? '0')
   const payTotal = parseFloat(payingOrder?.total ?? '0')
@@ -428,9 +448,9 @@ export function PedidosScreen({
   const payRemaining = Math.max(0, payTotal - totalReceived)
   const isPayCredit = !!(payLines[0] && paymentMethods.find((m) => m.key === payLines[0].method)?.isCredit)
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
   // Header (shared across all views)
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
   const Header = ({ onBack, title }: { onBack?: () => void; title?: string }) => (
     <div className="flex items-center h-14 px-4 border-b shrink-0 bg-background gap-3">
@@ -461,9 +481,9 @@ export function PedidosScreen({
     </div>
   )
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
   // Order card (list view)
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
   function OrderCard({ order }: { order: DBOrder }) {
     const cfg = STATUS_CONFIG[order.status] ?? STATUS_CONFIG.new
@@ -565,9 +585,9 @@ export function PedidosScreen({
     )
   }
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
   // LIST VIEW
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
   if (view === 'list') {
     return (
@@ -577,59 +597,131 @@ export function PedidosScreen({
         <div className="flex-1 overflow-y-auto p-4 space-y-6">
           {/* Top bar */}
           <div className="flex items-center justify-between">
-            <h1 className="text-xl font-bold">Pedidos activos</h1>
-            <Button variant="ghost" size="icon" onClick={manualRefresh} disabled={refreshing}>
-              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            <div className="flex gap-1 bg-muted rounded-lg p-1">
+              <button
+                onClick={() => setListTab('activos')}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  listTab === 'activos'
+                    ? 'bg-background shadow text-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Activos
+              </button>
+              <button
+                onClick={() => setListTab('historial')}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  listTab === 'historial'
+                    ? 'bg-background shadow text-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Historial
+              </button>
+            </div>
+            <Button
+              variant="ghost" size="icon"
+              onClick={() => listTab === 'activos' ? manualRefresh() : fetchHistorial()}
+              disabled={refreshing || loadingHistorial}
+            >
+              <RefreshCw className={`h-4 w-4 ${(refreshing || loadingHistorial) ? 'animate-spin' : ''}`} />
             </Button>
           </div>
 
-          {/* Empty state */}
-          {dbOrders.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-20 text-center gap-4">
-              <UtensilsCrossed className="h-14 w-14 text-muted-foreground/30" />
-              <p className="text-muted-foreground text-lg">Sin pedidos activos</p>
-            </div>
+          {/* ACTIVOS */}
+          {listTab === 'activos' && (
+            <>
+              {dbOrders.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-20 text-center gap-4">
+                  <UtensilsCrossed className="h-14 w-14 text-muted-foreground/30" />
+                  <p className="text-muted-foreground text-lg">Sin pedidos activos</p>
+                </div>
+              )}
+              {readyOrders.length > 0 && (
+                <section>
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <h2 className="text-sm font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+                      Listos para entregar
+                    </h2>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {readyOrders.map((o) => <OrderCard key={o.id} order={o} />)}
+                  </div>
+                </section>
+              )}
+              {inProgressOrders.length > 0 && (
+                <section>
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="h-2 w-2 rounded-full bg-amber-500" />
+                    <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">En proceso</h2>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {inProgressOrders.map((o) => <OrderCard key={o.id} order={o} />)}
+                  </div>
+                </section>
+              )}
+              {deliveredOrders.length > 0 && (
+                <section>
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="h-2 w-2 rounded-full bg-teal-500" />
+                    <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Entregados</h2>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {deliveredOrders.map((o) => <OrderCard key={o.id} order={o} />)}
+                  </div>
+                </section>
+              )}
+            </>
           )}
 
-          {/* Ready â€” highest priority */}
-          {readyOrders.length > 0 && (
-            <section>
-              <div className="flex items-center gap-2 mb-3">
-                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
-                  Listos para entregar
-                </h2>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {readyOrders.map((o) => <OrderCard key={o.id} order={o} />)}
-              </div>
-            </section>
-          )}
-
-          {/* In progress */}
-          {inProgressOrders.length > 0 && (
-            <section>
-              <div className="flex items-center gap-2 mb-3">
-                <span className="h-2 w-2 rounded-full bg-amber-500" />
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">En proceso</h2>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {inProgressOrders.map((o) => <OrderCard key={o.id} order={o} />)}
-              </div>
-            </section>
-          )}
-
-          {/* Delivered */}
-          {deliveredOrders.length > 0 && (
-            <section>
-              <div className="flex items-center gap-2 mb-3">
-                <span className="h-2 w-2 rounded-full bg-teal-500" />
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Entregados</h2>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {deliveredOrders.map((o) => <OrderCard key={o.id} order={o} />)}
-              </div>
-            </section>
+          {/* HISTORIAL */}
+          {listTab === 'historial' && (
+            <>
+              {loadingHistorial && (
+                <div className="flex justify-center py-20">
+                  <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              )}
+              {!loadingHistorial && historialOrders.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-20 text-center gap-4">
+                  <Clock className="h-14 w-14 text-muted-foreground/30" />
+                  <p className="text-muted-foreground text-lg">Sin historial</p>
+                </div>
+              )}
+              {!loadingHistorial && historialOrders.length > 0 && (
+                <div className="space-y-2">
+                  {historialOrders.map((o) => {
+                    const label = getOrderLabel(o, tables)
+                    const cfg = STATUS_CONFIG[o.status] ?? STATUS_CONFIG.closed
+                    return (
+                      <div
+                        key={o.id}
+                        onClick={() => { setDetailOrder(o); setView('detail') }}
+                        className="flex items-center gap-3 p-3 rounded-xl border bg-card hover:bg-muted/50 cursor-pointer transition-colors"
+                      >
+                        <span className="text-muted-foreground">{getOriginIcon(o.type)}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-sm">{label}</span>
+                            {o.displayCode && (
+                              <span className="text-xs font-mono text-muted-foreground">{o.displayCode}</span>
+                            )}
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            {o.closedAt ? new Date(o.closedAt).toLocaleString('es-CO') : elapsedLabel(o.createdAt)}
+                          </span>
+                        </div>
+                        <div className="flex flex-col items-end gap-1">
+                          <span className="font-bold text-sm">{fmt(parseFloat(o.total ?? '0'))}</span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${cfg.badge}`}>{cfg.label}</span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </>
           )}
         </div>
 
@@ -639,9 +731,9 @@ export function PedidosScreen({
     )
   }
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
   // DETAIL VIEW (DB order)
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
   if (view === 'detail' && detailOrder) {
     const cfg = STATUS_CONFIG[detailOrder.status] ?? STATUS_CONFIG.new
@@ -847,9 +939,9 @@ export function PedidosScreen({
     )
   }
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
   // ADD TO ORDER MODAL
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
   function AddToOrderModal() {
     return (
@@ -1026,9 +1118,9 @@ export function PedidosScreen({
   }
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
   // PAY MODAL
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
   function PayModal() {
     if (!payingOrder) return null
