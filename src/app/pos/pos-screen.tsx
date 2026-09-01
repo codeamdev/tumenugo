@@ -218,6 +218,7 @@ export function POSScreen({ categories, products, tables, userId, tenantName, cu
         localId: activeOrder.localId,
         items: activeOrder.items.map((i) => ({
           productId: i.productId,
+          ...(i.productId ? {} : { customName: i.productName, customPrice: i.unitPrice }),
           quantity: i.quantity,
           notes: i.notes,
           modifiers: i.modifiers,
@@ -602,6 +603,7 @@ export function POSScreen({ categories, products, tables, userId, tenantName, cu
                     localId: activeOrder.localId,
                     items: activeOrder.items.map((i) => ({
                       productId: i.productId,
+                      ...(i.productId ? {} : { customName: i.productName, customPrice: i.unitPrice }),
                       quantity: i.quantity,
                       notes: i.notes,
                       modifiers: i.modifiers,

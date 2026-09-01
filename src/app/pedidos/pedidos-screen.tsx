@@ -112,8 +112,8 @@ type ListTab = 'activos' | 'historial'
 const STATUS_CONFIG: Record<string, { label: string; badge: string; pulse?: boolean }> = {
   new:       { label: 'Nuevo',          badge: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300' },
   sent:      { label: 'En cocina',      badge: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' },
-  preparing: { label: 'Preparando',     badge: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300', pulse: true },
-  ready:     { label: 'Listo ✓',          badge: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300', pulse: true },
+  preparing: { label: 'Preparando',     badge: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' },
+  ready:     { label: 'Listo ✓',          badge: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' },
   delivered: { label: 'Entregado',      badge: 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300' },
   closed:    { label: 'Finalizado',     badge: 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400' },
   cancelled: { label: 'Anulado',        badge: 'bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400' },
@@ -640,7 +640,7 @@ export function PedidosScreen({
               {readyOrders.length > 0 && (
                 <section>
                   <div className="flex items-center gap-2 mb-3">
-                    <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="h-2 w-2 rounded-full bg-emerald-500" />
                     <h2 className="text-sm font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
                       Listos para entregar
                     </h2>

@@ -319,6 +319,7 @@ export async function DELETE(_: NextRequest, { params }: { params: { id: string 
   await withTenant(tenant.schemaName, async (db) => {
     const [order] = await db.select().from(orders).where(eq(orders.id, params.id)).limit(1)
     if (!order) return
+    await db.delete(cashRegisterEntries).where(eq(cashRegisterEntries.orderId, params.id))
     await db.delete(orderItems).where(eq(orderItems.orderId, params.id))
     await db.delete(orders).where(eq(orders.id, params.id))
     if (order.tableId) {
