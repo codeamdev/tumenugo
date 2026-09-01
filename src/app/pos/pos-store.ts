@@ -72,9 +72,9 @@ export const usePOSStore = create<POSState>()(
         set((s) => ({
           orders: s.orders.map((o) => {
             if (o.localId !== orderId) return o
-            // Merge if same product and no modifiers on either side
+            // Merge only for catalog products (not free/custom items) with no modifiers
             const noMods = item.modifiers.length === 0
-            const existing = noMods
+            const existing = noMods && item.productId !== null
               ? o.items.find((i) => i.productId === item.productId && i.modifiers.length === 0)
               : null
             if (existing) {
