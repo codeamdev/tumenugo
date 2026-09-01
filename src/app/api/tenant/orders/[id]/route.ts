@@ -32,6 +32,14 @@ const addItemsSchema = z.object({
   items: z.array(addItemSchema).min(1),
 })
 
+const updatePaymentSchema = z.object({
+  payments: z.array(z.object({
+    method: z.string(),
+    amount: z.number().min(0),
+  })).min(1),
+  paymentNotes: z.string().optional(),
+})
+
 const closeSchema = z.object({
   payments: z.array(z.object({
     method: z.string(),
@@ -182,6 +190,73 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       if (updated === 'CREDIT_NOTES_REQUIRED')
         return NextResponse.json({ error: 'La observación del pago es obligatoria para pagos pendientes' }, { status: 422 })
       return NextResponse.json({ data: updated })
+    }
+
+    // Update payment methods on a closed order
+    if (body.action === 'update_payment') {
+      const payData = updatePaymentSchema.parse(body)
+      const result = await withTenant(tenant.schemaName, async (db) => {
+        const [order] = await db.select().from(orders).where(eq(orders.id, params.id)).limit(1)
+        if (!order) return null
+        if (order.status !== 'closed') return 'not_closed' as const
+
+        const total = parseFloat(order.total ?? '0')
+        const validPayments = payData.payments.filter((p) => p.amount > 0)
+        if (validPayments.length === 0) return 'no_payments' as const
+
+        // Find the registerId from existing entries (to keep entry in same register)
+        const [existingEntry] = await db
+          .select({ registerId: cashRegisterEntries.registerId })
+          .from(cashRegisterEntries)
+          .where(eq(cashRegisterEntries.orderId, params.id))
+          .limit(1)
+
+        // If no existing entry, find the open register or last closed one
+        let registerId = existingEntry?.registerId
+        if (!registerId) {
+          const [reg] = await db
+            .select({ id: cashRegisters.id })
+            .from(cashRegisters)
+            .orderBy(desc(cashRegisters.openedAt))
+            .limit(1)
+          registerId = reg?.id
+        }
+        if (!registerId) return 'no_register' as const
+
+        // Replace entries
+        await db.delete(cashRegisterEntries).where(eq(cashRegisterEntries.orderId, params.id))
+
+        let remaining = total
+        for (const payment of validPayments) {
+          const dbMethod = toDbMethod(payment.method)
+          const effectiveAmount = Math.min(payment.amount, remaining)
+          remaining -= effectiveAmount
+          if (effectiveAmount <= 0) continue
+          await db.insert(cashRegisterEntries).values({
+            registerId,
+            orderId: params.id,
+            type: 'sale',
+            amount: String(effectiveAmount),
+            paymentMethod: dbMethod,
+            notes: payment.method !== dbMethod ? payment.method : (payData.paymentNotes ?? null),
+          })
+        }
+
+        const primaryMethod = toDbMethod(validPayments[0].method)
+        const [updated] = await db
+          .update(orders)
+          .set({ paymentMethod: primaryMethod, paymentNotes: payData.paymentNotes ?? null, updatedAt: new Date() })
+          .where(eq(orders.id, params.id))
+          .returning()
+
+        return updated
+      })
+
+      if (!result) return NextResponse.json({ error: 'No encontrado' }, { status: 404 })
+      if (result === 'not_closed') return NextResponse.json({ error: 'Solo se puede editar el pago de pedidos cerrados' }, { status: 422 })
+      if (result === 'no_payments') return NextResponse.json({ error: 'Debes ingresar al menos un pago' }, { status: 422 })
+      if (result === 'no_register') return NextResponse.json({ error: 'No se encontró registro de caja' }, { status: 422 })
+      return NextResponse.json({ data: result })
     }
 
     // Add items to existing order

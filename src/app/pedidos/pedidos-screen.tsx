@@ -100,6 +100,8 @@ interface DBOrder {
   createdAt: string
   closedAt?: string | null
   paymentMethod?: string | null
+  paymentStatus?: string | null
+  paymentNotes?: string | null
   itemsCount?: number
   items?: DBOrderItem[]
 }
@@ -205,6 +207,12 @@ export function PedidosScreen({
   const [payNotes, setPayNotes] = useState('')
   const [payCustomerName, setPayCustomerName] = useState('')
   const [paying, setPaying] = useState(false)
+
+  // -- Edit payment state
+  const [showEditPay, setShowEditPay] = useState(false)
+  const [editPayLines, setEditPayLines] = useState<{ method: string; amount: string }[]>([])
+  const [editPayNotes, setEditPayNotes] = useState('')
+  const [savingEditPay, setSavingEditPay] = useState(false)
 
   // â"€â"€ Add-to-order state
   const [showAddToOrder, setShowAddToOrder] = useState(false)
@@ -977,11 +985,97 @@ export function PedidosScreen({
                 Agregar productos
               </Button>
             )}
+            {detailOrder.status === 'closed' && detailOrder.paymentStatus !== 'pending' && role === 'admin' && (
+              <Button
+                variant="outline"
+                className="h-12 gap-2"
+                onClick={() => {
+                  setEditPayLines([{ method: detailOrder.paymentMethod ?? 'cash', amount: String(parseFloat(detailOrder.total ?? '0')) }])
+                  setEditPayNotes(detailOrder.paymentNotes ?? '')
+                  setShowEditPay(true)
+                }}
+              >
+                Editar pago
+              </Button>
+            )}
           </div>
         </div>
 
         {showPayModal && payingOrder && PayModal()}
         {showAddToOrder && AddToOrderModal()}
+
+        {/* Edit payment modal */}
+        <Dialog open={showEditPay} onOpenChange={(o) => { if (!o) setShowEditPay(false) }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Editar forma de pago</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 py-2">
+              {editPayLines.map((line, i) => (
+                <div key={i} className="flex gap-2 items-center">
+                  <Select value={line.method} onValueChange={(v) => setEditPayLines((prev) => prev.map((l, j) => j === i ? { ...l, method: v } : l))}>
+                    <SelectTrigger className="w-40">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {paymentMethods.map((m) => (
+                        <SelectItem key={m.key} value={m.key}>{m.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    type="number"
+                    value={line.amount}
+                    onChange={(e) => setEditPayLines((prev) => prev.map((l, j) => j === i ? { ...l, amount: e.target.value } : l))}
+                    className="flex-1"
+                    placeholder="Monto"
+                  />
+                  {editPayLines.length > 1 && (
+                    <button onClick={() => setEditPayLines((prev) => prev.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-destructive">
+                      <Minus className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              ))}
+              <Button variant="ghost" size="sm" onClick={() => setEditPayLines((prev) => [...prev, { method: paymentMethods[0]?.key ?? 'cash', amount: '' }])}>
+                <Plus className="h-4 w-4 mr-1" /> Agregar método
+              </Button>
+              <div>
+                <Label className="text-xs text-muted-foreground">Notas de pago (opcional)</Label>
+                <Input value={editPayNotes} onChange={(e) => setEditPayNotes(e.target.value)} placeholder="Observaciones" />
+              </div>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <Button variant="outline" className="flex-1" onClick={() => setShowEditPay(false)}>Cancelar</Button>
+              <Button
+                className="flex-1"
+                disabled={savingEditPay}
+                onClick={async () => {
+                  if (!detailOrder) return
+                  setSavingEditPay(true)
+                  try {
+                    const payments = editPayLines
+                      .filter((l) => parseFloat(l.amount) > 0)
+                      .map((l) => ({ method: l.method, amount: parseFloat(l.amount) }))
+                    const res = await fetch(`/api/tenant/orders/${detailOrder.id}`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ action: 'update_payment', payments, paymentNotes: editPayNotes || undefined }),
+                    })
+                    const json = await res.json()
+                    if (!res.ok) { toast({ title: 'Error', description: json.error, variant: 'destructive' }); return }
+                    setDetailOrder((prev) => prev ? { ...prev, paymentMethod: json.data.paymentMethod, paymentNotes: json.data.paymentNotes } : prev)
+                    setShowEditPay(false)
+                    toast({ title: 'Pago actualizado' })
+                  } finally { setSavingEditPay(false) }
+                }}
+              >
+                {savingEditPay ? 'Guardando...' : 'Guardar'}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
         {modifiersProduct && (
           <ModifiersModal
             product={modifiersProduct}
