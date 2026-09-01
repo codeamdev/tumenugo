@@ -788,6 +788,11 @@ export function PedidosScreen({
                         <div className="flex flex-col items-end gap-1">
                           <span className="font-bold text-sm">{fmt(parseFloat(o.total ?? '0'))}</span>
                           <span className={`text-xs px-2 py-0.5 rounded-full ${cfg.badge}`}>{cfg.label}</span>
+                          {o.paymentMethod && (
+                            <span className="text-xs text-muted-foreground">
+                              {paymentMethods.find((m) => m.key === o.paymentMethod)?.label ?? o.paymentMethod}
+                            </span>
+                          )}
                         </div>
                       </div>
                     )
