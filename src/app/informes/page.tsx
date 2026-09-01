@@ -59,17 +59,47 @@ function todayISO() {
   return `${y}-${m}-${d}`
 }
 
+function getMondayISO() {
+  const now = new Date()
+  const day = now.getDay() // 0=Dom
+  const diff = day === 0 ? -6 : 1 - day
+  const mon = new Date(now)
+  mon.setDate(now.getDate() + diff)
+  return mon.toISOString().slice(0, 10)
+}
+
+function getSundayISO() {
+  const now = new Date()
+  const day = now.getDay()
+  const diff = day === 0 ? 0 : 7 - day
+  const sun = new Date(now)
+  sun.setDate(now.getDate() + diff)
+  return sun.toISOString().slice(0, 10)
+}
+
+function getMonthFirstISO() {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+}
+
+function getMonthLastISO() {
+  const now = new Date()
+  const last = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+  return `${last.getFullYear()}-${String(last.getMonth() + 1).padStart(2, '0')}-${String(last.getDate()).padStart(2, '0')}`
+}
+
 function formatDate(iso: string) {
   return new Date(iso + 'T00:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })
 }
 
 const QUICK_RANGES = [
-  { label: 'Hoy', days: 0 },
-  { label: 'Semana', days: 7 },
-  { label: 'Mes', days: 30 },
+  { label: 'Turno', key: 'shift' },
+  { label: 'Semana', key: 'week' },
+  { label: 'Mes', key: 'month' },
 ]
 
 export default function InformesPage() {
+  const [useShift, setUseShift] = useState(true)
   const [from, setFrom] = useState(todayISO())
   const [to, setTo] = useState(todayISO())
   const [data, setData] = useState<ReportData | null>(null)
@@ -80,7 +110,10 @@ export default function InformesPage() {
   async function load() {
     setLoading(true)
     try {
-      const res = await fetch(`/api/tenant/informes?from=${from}&to=${to}`)
+      const url = useShift
+        ? '/api/tenant/informes?range=shift'
+        : `/api/tenant/informes?from=${from}&to=${to}`
+      const res = await fetch(url)
       const json = await res.json()
       setData(json.data)
     } finally {
@@ -88,15 +121,13 @@ export default function InformesPage() {
     }
   }
 
-  useEffect(() => { load() }, [from, to])
+  useEffect(() => { load() }, [from, to, useShift])
 
-  function setRange(days: number) {
-    const t = todayISO()
-    if (days === 0) { setFrom(t); setTo(t); return }
-    const f = new Date()
-    f.setDate(f.getDate() - days)
-    setFrom(f.toISOString().slice(0, 10))
-    setTo(t)
+  function setRange(key: string) {
+    if (key === 'shift') { setUseShift(true); return }
+    setUseShift(false)
+    if (key === 'week') { setFrom(getMondayISO()); setTo(getSundayISO()); return }
+    if (key === 'month') { setFrom(getMonthFirstISO()); setTo(getMonthLastISO()); return }
   }
 
   const methodPie = data
@@ -114,9 +145,13 @@ export default function InformesPage() {
         <div className="flex items-center gap-2 flex-wrap">
           {QUICK_RANGES.map((r) => (
             <button
-              key={r.label}
-              onClick={() => setRange(r.days)}
-              className="rounded-full px-3 py-1 text-sm border hover:bg-muted transition-colors"
+              key={r.key}
+              onClick={() => setRange(r.key)}
+              className={`rounded-full px-3 py-1 text-sm border transition-colors ${
+                (r.key === 'shift' && useShift) || (r.key !== 'shift' && !useShift && from === (r.key === 'week' ? getMondayISO() : getMonthFirstISO()))
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'hover:bg-muted'
+              }`}
             >
               {r.label}
             </button>
@@ -127,7 +162,7 @@ export default function InformesPage() {
               type="date"
               value={from}
               max={to}
-              onChange={(e) => setFrom(e.target.value)}
+              onChange={(e) => { setUseShift(false); setFrom(e.target.value) }}
               className="rounded-md border bg-background px-2 py-1 text-sm"
             />
           </div>
@@ -138,7 +173,7 @@ export default function InformesPage() {
               value={to}
               min={from}
               max={todayISO()}
-              onChange={(e) => setTo(e.target.value)}
+              onChange={(e) => { setUseShift(false); setTo(e.target.value) }}
               className="rounded-md border bg-background px-2 py-1 text-sm"
             />
           </div>

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { eq, desc, and, ne, inArray, notInArray, sql, gte, lt } from 'drizzle-orm'
+import { eq, desc, and, ne, inArray, notInArray, sql, gte, lt, lte } from 'drizzle-orm'
 import { requireTenantSession } from '@/lib/auth/session'
 import { requireActiveTenant } from '@/lib/tenant'
 import { withTenant } from '@/lib/db/tenant-db'
@@ -52,10 +52,28 @@ export async function GET(request: NextRequest) {
   const status = rawStatus as OrderStatusValue | null
 
   const historial = searchParams.get('historial') === 'true'
+  const historialFrom = searchParams.get('from')
+  const historialTo   = searchParams.get('to')
+
+  // Colombia UTC-5: convert YYYY-MM-DD to UTC boundaries
+  function colStart(d: string): Date {
+    const [y, m, day] = d.split('-').map(Number)
+    return new Date(Date.UTC(y, m - 1, day, 5, 0, 0, 0)) // midnight Colombia = 05:00 UTC
+  }
+  function colEnd(d: string): Date {
+    const [y, m, day] = d.split('-').map(Number)
+    return new Date(Date.UTC(y, m - 1, day, 5, 0, 0, 0) + 86_400_000 - 1)
+  }
 
   const data = await withTenant(tenant.schemaName, async (db) => {
+    const historialConditions: ReturnType<typeof and>[] = [
+      inArray(orders.status, ['closed', 'cancelled'] as any[]) as any,
+    ]
+    if (historial && historialFrom) historialConditions.push(gte(orders.closedAt, colStart(historialFrom)) as any)
+    if (historial && historialTo)   historialConditions.push(lte(orders.closedAt, colEnd(historialTo)) as any)
+
     const orderList = historial
-      ? await db.select().from(orders).where(inArray(orders.status, ['closed', 'cancelled'] as any[])).orderBy(desc(orders.createdAt))
+      ? await db.select().from(orders).where(and(...historialConditions)).orderBy(desc(orders.createdAt))
       : status
         ? await db.select().from(orders).where(eq(orders.status, status)).orderBy(desc(orders.createdAt))
         : await db.select().from(orders).where(and(ne(orders.status, 'closed'), ne(orders.status, 'cancelled'))).orderBy(desc(orders.createdAt))

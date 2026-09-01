@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireTenantSession } from '@/lib/auth/session'
 import { requireActiveTenant } from '@/lib/tenant'
 import { withTenant } from '@/lib/db/tenant-db'
-import { orders, orderItems, products, categories, cashRegisterEntries, tables } from '@/lib/db/schema/tenant'
-import { and, eq, gte, lte, inArray, sql } from 'drizzle-orm'
+import { orders, orderItems, products, categories, cashRegisterEntries, tables, cashRegisters } from '@/lib/db/schema/tenant'
+import { and, eq, gte, lte, inArray, sql, desc } from 'drizzle-orm'
 
 import { buildMethodLabels } from '@/lib/payment-methods'
 import type { PosConfig } from '@/lib/db/schema/public'
@@ -61,11 +61,31 @@ export async function GET(req: NextRequest) {
   const tenant = await requireActiveTenant()
 
   const { searchParams } = new URL(req.url)
-  const fromStr = searchParams.get('from') ?? localDateStr()
-  const toStr   = searchParams.get('to')   ?? localDateStr()
-  const tz  = (tenant as any).timezone ?? 'America/Bogota'
-  const from = startOfDay(fromStr, tz)
-  const to   = endOfDay(toStr, tz)
+  const rangeParam = searchParams.get('range')
+  const tz = (tenant as any).timezone ?? 'America/Bogota'
+
+  let from: Date
+  let to: Date
+
+  if (rangeParam === 'shift') {
+    // Usar la apertura del turno actual como inicio del rango
+    const openReg = await withTenant(tenant.schemaName, async (db) => {
+      const [reg] = await db
+        .select({ openedAt: cashRegisters.openedAt })
+        .from(cashRegisters)
+        .where(eq(cashRegisters.status, 'open'))
+        .orderBy(desc(cashRegisters.openedAt))
+        .limit(1)
+      return reg ?? null
+    })
+    from = openReg?.openedAt ?? startOfDay(localDateStr(), tz)
+    to   = new Date()
+  } else {
+    const fromStr = searchParams.get('from') ?? localDateStr()
+    const toStr   = searchParams.get('to')   ?? localDateStr()
+    from = startOfDay(fromStr, tz)
+    to   = endOfDay(toStr, tz)
+  }
 
   const data = await withTenant(tenant.schemaName, async (db) => {
     // Pedidos cerrados y cobrados en el período

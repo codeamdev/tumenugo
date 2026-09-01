@@ -162,6 +162,13 @@ export function PedidosScreen({
   const [refreshing, setRefreshing] = useState(false)
   const [loadingHistorial, setLoadingHistorial] = useState(false)
 
+  // Historial filters
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const [hDateFrom, setHDateFrom] = useState(todayStr)
+  const [hDateTo,   setHDateTo]   = useState(todayStr)
+  const [hMethod,   setHMethod]   = useState('')
+  const [hType,     setHType]     = useState('')
+
   // â"€â"€ Modifiers modal (for add-to-order)
   const [modifiersProduct, setModifiersProduct] = useState<ProductWithModifiers | null>(null)
 
@@ -231,19 +238,29 @@ export function PedidosScreen({
     setRefreshing(false)
   }
 
-  const fetchHistorial = useCallback(async () => {
+  const fetchHistorial = useCallback(async (from?: string, to?: string) => {
     setLoadingHistorial(true)
     try {
-      const res = await fetch('/api/tenant/orders?historial=true')
+      const f = from ?? hDateFrom
+      const t = to   ?? hDateTo
+      const res = await fetch(`/api/tenant/orders?historial=true&from=${f}&to=${t}`)
       if (!res.ok) return
       const json = await res.json()
       setHistorialOrders(json.data ?? [])
     } catch { /* silent */ } finally { setLoadingHistorial(false) }
-  }, [])
+  }, [hDateFrom, hDateTo])
 
   useEffect(() => {
     if (listTab === 'historial') fetchHistorial()
   }, [listTab, fetchHistorial])
+
+  const filteredHistorial = useMemo(() => {
+    return historialOrders.filter((o) => {
+      if (hMethod && o.paymentMethod !== hMethod) return false
+      if (hType && o.type !== hType) return false
+      return true
+    })
+  }, [historialOrders, hMethod, hType])
 
   // â"€â"€ Grouped orders â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
@@ -678,20 +695,68 @@ export function PedidosScreen({
           {/* HISTORIAL */}
           {listTab === 'historial' && (
             <>
+              {/* Filtros */}
+              <div className="space-y-2">
+                <div className="flex gap-2 flex-wrap">
+                  <input
+                    type="date"
+                    value={hDateFrom}
+                    max={hDateTo}
+                    onChange={(e) => { setHDateFrom(e.target.value); fetchHistorial(e.target.value, hDateTo) }}
+                    className="rounded-md border bg-background px-2 py-1 text-sm"
+                  />
+                  <span className="self-center text-muted-foreground text-sm">→</span>
+                  <input
+                    type="date"
+                    value={hDateTo}
+                    min={hDateFrom}
+                    onChange={(e) => { setHDateTo(e.target.value); fetchHistorial(hDateFrom, e.target.value) }}
+                    className="rounded-md border bg-background px-2 py-1 text-sm"
+                  />
+                </div>
+                <div className="flex gap-2 flex-wrap">
+                  <Select value={hMethod} onValueChange={setHMethod}>
+                    <SelectTrigger className="h-8 text-xs w-40">
+                      <SelectValue placeholder="Forma de pago" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Todas</SelectItem>
+                      <SelectItem value="cash">Efectivo</SelectItem>
+                      <SelectItem value="nequi">Nequi</SelectItem>
+                      <SelectItem value="card">Tarjeta</SelectItem>
+                      <SelectItem value="transfer">Transferencia</SelectItem>
+                      <SelectItem value="other">Otro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={hType} onValueChange={setHType}>
+                    <SelectTrigger className="h-8 text-xs w-36">
+                      <SelectValue placeholder="Tipo de pedido" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Todos</SelectItem>
+                      <SelectItem value="table">Mesa</SelectItem>
+                      <SelectItem value="bar">Barra</SelectItem>
+                      <SelectItem value="delivery">Domicilio</SelectItem>
+                      <SelectItem value="takeout">Para llevar</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
               {loadingHistorial && (
                 <div className="flex justify-center py-20">
                   <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
                 </div>
               )}
-              {!loadingHistorial && historialOrders.length === 0 && (
+              {!loadingHistorial && filteredHistorial.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-20 text-center gap-4">
                   <Clock className="h-14 w-14 text-muted-foreground/30" />
                   <p className="text-muted-foreground text-lg">Sin historial</p>
                 </div>
               )}
-              {!loadingHistorial && historialOrders.length > 0 && (
+              {!loadingHistorial && filteredHistorial.length > 0 && (
                 <div className="space-y-2">
-                  {historialOrders.map((o) => {
+                  {filteredHistorial.map((o) => {
                     const label = getOrderLabel(o, tables)
                     const cfg = STATUS_CONFIG[o.status] ?? STATUS_CONFIG.closed
                     return (

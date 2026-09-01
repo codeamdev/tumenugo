@@ -209,12 +209,37 @@ export async function POST(req: NextRequest) {
             )
           )
 
-        const cashSales = closedOrders
-          .filter((o) => o.paymentMethod === 'cash')
-          .reduce((s, o) => s + parseFloat(o.total ?? '0'), 0)
-
-        // expectedCash = ventas en efectivo únicamente (base no es ingreso)
-        const expectedCash = cashSales
+        // expectedCash desde entries (igual que la vista de caja abierta)
+        const byMethodClose: Record<string, number> = {}
+        if (closedOrders.length > 0) {
+          const orderIds = closedOrders.map((o) => o.id)
+          const allEntries = await db
+            .select()
+            .from(cashRegisterEntries)
+            .where(and(inArray(cashRegisterEntries.orderId, orderIds), eq(cashRegisterEntries.type, 'sale')))
+          const entriesByOrder: Record<string, typeof allEntries> = {}
+          for (const e of allEntries) {
+            if (!entriesByOrder[e.orderId!]) entriesByOrder[e.orderId!] = []
+            entriesByOrder[e.orderId!].push(e)
+          }
+          for (const o of closedOrders) {
+            const oe = entriesByOrder[o.id]
+            if (!oe?.length) {
+              const m = o.paymentMethod ?? 'other'
+              byMethodClose[m] = (byMethodClose[m] ?? 0) + parseFloat(o.total ?? '0')
+              continue
+            }
+            let rem = parseFloat(o.total ?? '0')
+            const sorted = [...oe].sort((a, b) => parseFloat(a.amount ?? '0') - parseFloat(b.amount ?? '0'))
+            for (const e of sorted) {
+              const key = e.paymentMethod ?? 'other'
+              const capped = Math.min(parseFloat(e.amount ?? '0'), rem)
+              rem -= capped
+              if (capped > 0) byMethodClose[key] = (byMethodClose[key] ?? 0) + capped
+            }
+          }
+        }
+        const expectedCash = byMethodClose['cash'] ?? 0
 
         const countedCashVal = input.countedByMethod
           ? (input.countedByMethod['cash'] ?? 0)
