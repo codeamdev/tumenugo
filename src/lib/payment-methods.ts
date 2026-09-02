@@ -36,7 +36,11 @@ export function getPaymentMethods(posConfig: PosConfig | null | undefined): Paym
 
 export function buildMethodLabels(posConfig: PosConfig | null | undefined): Record<string, string> {
   const base = Object.fromEntries(DEFAULT_PAYMENT_METHODS.map((m) => [m.key, m.label]))
-  for (const m of getPaymentMethods(posConfig)) base[m.key] = m.label
+  const methods = getPaymentMethods(posConfig)
+  for (const m of methods) base[m.key] = m.label
+  // 'fiado' is the DB bucket for all credit methods — map it to the tenant's credit label
+  const creditMethod = methods.find((m) => m.isCredit)
+  if (creditMethod) base['fiado'] = creditMethod.label
   return base
 }
 
