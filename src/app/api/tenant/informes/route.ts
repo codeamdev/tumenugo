@@ -201,8 +201,7 @@ export async function GET(req: NextRequest) {
         const orderTotal = parseFloat(o.total ?? '0')
         const rawTotal   = orderEntries.reduce((s, e) => s + parseFloat(e.amount ?? '0'), 0)
         for (const e of orderEntries) {
-          const isCustomKey = e.paymentMethod === 'other' && typeof e.notes === 'string' && /^[\w-]+$/.test(e.notes)
-          const key   = isCustomKey ? e.notes! : (e.paymentMethod ?? 'other')
+            const key = e.paymentMethod ?? 'other'
           const ratio = rawTotal > 0 ? parseFloat(e.amount ?? '0') / rawTotal : 1 / orderEntries.length
           byMethod[key] = (byMethod[key] ?? 0) + orderTotal * ratio
         }

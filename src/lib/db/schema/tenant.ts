@@ -51,15 +51,6 @@ export const itemStatusEnum = pgEnum('item_status', [
 
 export const paymentStatusEnum = pgEnum('payment_status', ['pending', 'paid'])
 
-export const paymentMethodEnum = pgEnum('payment_method', [
-  'cash',
-  'card',
-  'transfer',
-  'nequi',
-  'daviplata',
-  'other',
-  'fiado',
-])
 
 export const registerStatusEnum = pgEnum('register_status', ['open', 'closed'])
 
@@ -207,7 +198,7 @@ export const orders = pgTable('orders', {
   total: numeric('total', { precision: 12, scale: 2 }).notNull().default('0'),
   // Payment
   paymentStatus: paymentStatusEnum('payment_status').notNull().default('pending'),
-  paymentMethod: paymentMethodEnum('payment_method'),
+  paymentMethod: text('payment_method'),
   cashReceived: numeric('cash_received', { precision: 12, scale: 2 }),
   changeGiven: numeric('change_given', { precision: 12, scale: 2 }),
   paymentNotes: text('payment_notes'),
@@ -264,7 +255,7 @@ export const cashRegisterEntries = pgTable('cash_register_entries', {
   orderId: uuid('order_id'),
   type: entryTypeEnum('type').notNull(),
   amount: numeric('amount', { precision: 12, scale: 2 }).notNull(),
-  paymentMethod: paymentMethodEnum('payment_method').notNull(),
+  paymentMethod: text('payment_method').notNull(),
   notes: text('notes'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 })

@@ -110,8 +110,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
         const totalReceived = isCredit ? 0 : validPayments.reduce((s, p) => s + p.amount, 0)
         const changeGiven = isCredit ? 0 : Math.max(0, totalReceived - total)
-        // Credit orders always map to 'fiado' so they resolve to the credit label, not 'other'
-        const primaryMethod = isCredit ? 'fiado' : (validPayments.length > 0 ? toDbMethod(validPayments[0].method) : 'other')
+        const primaryMethod = validPayments.length > 0 ? toDbMethod(validPayments[0].method) : 'other'
 
         const [updated] = await db
           .update(orders)
@@ -177,7 +176,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
               type: 'sale',
               amount: String(effectiveAmount),
               paymentMethod: dbMethod,
-              notes: payment.method !== dbMethod ? payment.method : closeData.paymentNotes,
+              notes: closeData.paymentNotes ?? null,
             })
           }
         }
@@ -239,7 +238,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
             type: 'sale',
             amount: String(effectiveAmount),
             paymentMethod: dbMethod,
-            notes: payment.method !== dbMethod ? payment.method : (payData.paymentNotes ?? null),
+            notes: payData.paymentNotes ?? null,
           })
         }
 

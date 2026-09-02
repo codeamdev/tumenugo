@@ -16,11 +16,8 @@ export const DEFAULT_PAYMENT_METHODS: PaymentMethodConfig[] = [
   { key: 'fiado',     label: 'Pendiente por pagar', isCredit: true  },
 ]
 
-export const VALID_DB_METHODS = ['cash', 'card', 'transfer', 'nequi', 'daviplata', 'other', 'fiado'] as const
-export type DbPaymentMethod = typeof VALID_DB_METHODS[number]
-
-export function toDbMethod(key: string): DbPaymentMethod {
-  return VALID_DB_METHODS.includes(key as DbPaymentMethod) ? (key as DbPaymentMethod) : 'other'
+export function toDbMethod(key: string): string {
+  return key || 'other'
 }
 
 export function getPaymentMethods(posConfig: PosConfig | null | undefined): PaymentMethodConfig[] {

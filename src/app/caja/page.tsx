@@ -56,8 +56,7 @@ export default async function CajaPage() {
           let remaining = orderTotal
           const sorted = [...orderEntries].sort((a, b) => parseFloat(a.amount ?? '0') - parseFloat(b.amount ?? '0'))
           for (const e of sorted) {
-            const isCustomKey = e.paymentMethod === 'other' && typeof e.notes === 'string' && /^[\w-]+$/.test(e.notes)
-            const key = isCustomKey ? e.notes! : (e.paymentMethod ?? 'other')
+            const key = e.paymentMethod ?? 'other'
             const capped = Math.min(parseFloat(e.amount ?? '0'), remaining)
             remaining -= capped
             if (capped > 0) byMethod[key] = (byMethod[key] ?? 0) + capped
