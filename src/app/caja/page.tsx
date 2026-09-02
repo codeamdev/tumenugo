@@ -27,7 +27,7 @@ export default async function CajaPage() {
       const closedOrders = await db
         .select()
         .from(orders)
-        .where(and(eq(orders.status, 'closed'), gte(orders.closedAt, register.openedAt!)))
+        .where(and(eq(orders.status, 'closed'), eq(orders.paymentStatus, 'paid'), gte(orders.closedAt, register.openedAt!)))
 
       const byMethod: Record<string, number> = {}
       let totalTips = 0
@@ -56,7 +56,7 @@ export default async function CajaPage() {
           let remaining = orderTotal
           const sorted = [...orderEntries].sort((a, b) => parseFloat(a.amount ?? '0') - parseFloat(b.amount ?? '0'))
           for (const e of sorted) {
-            const isCustomKey = e.paymentMethod === 'other' && e.notes && methodLabels[e.notes] !== undefined
+            const isCustomKey = e.paymentMethod === 'other' && typeof e.notes === 'string' && /^[\w-]+$/.test(e.notes)
             const key = isCustomKey ? e.notes! : (e.paymentMethod ?? 'other')
             const capped = Math.min(parseFloat(e.amount ?? '0'), remaining)
             remaining -= capped
