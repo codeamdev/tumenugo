@@ -12,7 +12,7 @@ import { useToast } from '@/components/ui/use-toast'
 import { ModifiersModal } from '@/app/pos/modifiers-modal'
 import {
   Plus, Trash2, Search, UtensilsCrossed, Truck, BarChart3, ShoppingBag,
-  ChevronLeft, RefreshCw, LogOut, Clock, CheckCircle2, Minus,
+  ChevronLeft, RefreshCw, LogOut, Clock, CheckCircle2, Minus, SlidersHorizontal,
 } from 'lucide-react'
 import type { PaymentMethodConfig } from '@/lib/payment-methods'
 
@@ -170,6 +170,7 @@ export function PedidosScreen({
   const [hDateTo,   setHDateTo]   = useState(todayStr)
   const [hMethod,   setHMethod]   = useState('')
   const [hType,     setHType]     = useState('')
+  const [filterOpen, setFilterOpen] = useState(false)
 
   // â"€â"€ Modifiers modal (for add-to-order)
   const [modifiersProduct, setModifiersProduct] = useState<ProductWithModifiers | null>(null)
@@ -644,14 +645,86 @@ export function PedidosScreen({
                 Historial
               </button>
             </div>
-            <Button
-              variant="ghost" size="icon"
-              onClick={() => listTab === 'activos' ? manualRefresh() : fetchHistorial()}
-              disabled={refreshing || loadingHistorial}
-            >
-              <RefreshCw className={`h-4 w-4 ${(refreshing || loadingHistorial) ? 'animate-spin' : ''}`} />
-            </Button>
+            <div className="flex items-center gap-1">
+              {listTab === 'historial' && (
+                <Button
+                  variant="ghost" size="icon"
+                  onClick={() => setFilterOpen((v) => !v)}
+                  className="relative"
+                >
+                  <SlidersHorizontal className={`h-4 w-4 ${filterOpen ? 'text-primary' : ''}`} />
+                  {(hMethod || hType) && (
+                    <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-primary" />
+                  )}
+                </Button>
+              )}
+              <Button
+                variant="ghost" size="icon"
+                onClick={() => listTab === 'activos' ? manualRefresh() : fetchHistorial()}
+                disabled={refreshing || loadingHistorial}
+              >
+                <RefreshCw className={`h-4 w-4 ${(refreshing || loadingHistorial) ? 'animate-spin' : ''}`} />
+              </Button>
+            </div>
           </div>
+
+          {/* Panel de filtros historial */}
+          {listTab === 'historial' && filterOpen && (
+            <div className="border rounded-xl p-4 space-y-4 bg-muted/30">
+              <div className="flex gap-3 flex-wrap items-end">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Desde</label>
+                  <input
+                    type="date"
+                    value={hDateFrom}
+                    max={hDateTo}
+                    onChange={(e) => { setHDateFrom(e.target.value); fetchHistorial(e.target.value, hDateTo) }}
+                    className="rounded-md border bg-background px-2 py-1.5 text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Hasta</label>
+                  <input
+                    type="date"
+                    value={hDateTo}
+                    min={hDateFrom}
+                    onChange={(e) => { setHDateTo(e.target.value); fetchHistorial(hDateFrom, e.target.value) }}
+                    className="rounded-md border bg-background px-2 py-1.5 text-sm"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Forma de pago</p>
+                <div className="flex flex-wrap gap-2">
+                  {[{ key: '', label: 'Todas' }, ...paymentMethods].map((m) => (
+                    <button
+                      key={m.key}
+                      onClick={() => setHMethod(m.key)}
+                      className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${hMethod === m.key ? 'bg-primary text-primary-foreground border-primary' : 'hover:bg-muted'}`}
+                    >{m.label}</button>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tipo de pedido</p>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { key: '', label: 'Todos' },
+                    { key: 'table', label: 'Mesa' },
+                    { key: 'bar', label: 'Barra' },
+                    { key: 'delivery', label: 'Domicilio' },
+                    { key: 'takeout', label: 'Para llevar' },
+                  ].map((f) => (
+                    <button
+                      key={f.key}
+                      onClick={() => setHType(f.key)}
+                      className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${hType === f.key ? 'bg-primary text-primary-foreground border-primary' : 'hover:bg-muted'}`}
+                    >{f.label}</button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* ACTIVOS */}
           {listTab === 'activos' && (
@@ -703,51 +776,6 @@ export function PedidosScreen({
           {/* HISTORIAL */}
           {listTab === 'historial' && (
             <>
-              {/* Filtros */}
-              <div className="space-y-2">
-                <div className="flex gap-2 flex-wrap">
-                  <input
-                    type="date"
-                    value={hDateFrom}
-                    max={hDateTo}
-                    onChange={(e) => { setHDateFrom(e.target.value); fetchHistorial(e.target.value, hDateTo) }}
-                    className="rounded-md border bg-background px-2 py-1 text-sm"
-                  />
-                  <span className="self-center text-muted-foreground text-sm">→</span>
-                  <input
-                    type="date"
-                    value={hDateTo}
-                    min={hDateFrom}
-                    onChange={(e) => { setHDateTo(e.target.value); fetchHistorial(hDateFrom, e.target.value) }}
-                    className="rounded-md border bg-background px-2 py-1 text-sm"
-                  />
-                </div>
-                <div className="flex gap-2 flex-wrap">
-                  <Select value={hMethod} onValueChange={setHMethod}>
-                    <SelectTrigger className="h-8 text-xs w-40">
-                      <SelectValue placeholder="Forma de pago" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">Todas</SelectItem>
-                      {paymentMethods.map((m) => (
-                        <SelectItem key={m.key} value={m.key}>{m.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Select value={hType} onValueChange={setHType}>
-                    <SelectTrigger className="h-8 text-xs w-36">
-                      <SelectValue placeholder="Tipo de pedido" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">Todos</SelectItem>
-                      <SelectItem value="table">Mesa</SelectItem>
-                      <SelectItem value="bar">Barra</SelectItem>
-                      <SelectItem value="delivery">Domicilio</SelectItem>
-                      <SelectItem value="takeout">Para llevar</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
 
               {loadingHistorial && (
                 <div className="flex justify-center py-20">
