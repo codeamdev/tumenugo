@@ -729,11 +729,9 @@ export function PedidosScreen({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="">Todas</SelectItem>
-                      <SelectItem value="cash">Efectivo</SelectItem>
-                      <SelectItem value="nequi">Nequi</SelectItem>
-                      <SelectItem value="card">Tarjeta</SelectItem>
-                      <SelectItem value="transfer">Transferencia</SelectItem>
-                      <SelectItem value="other">Otro</SelectItem>
+                      {paymentMethods.map((m) => (
+                        <SelectItem key={m.key} value={m.key}>{m.label}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   <Select value={hType} onValueChange={setHType}>
