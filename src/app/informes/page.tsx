@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Separator } from '@/components/ui/separator'
+import { Input } from '@/components/ui/input'
 import { formatCurrency } from '@/lib/utils'
 import { Download, TrendingUp, ShoppingBag, AlertTriangle, Clock, XCircle } from 'lucide-react'
 import {
@@ -35,9 +36,12 @@ interface CancelledOrder {
   tableName: string | null
 }
 
+interface PaymentMethodCfg { key: string; label: string; isCredit?: boolean }
+
 interface ReportData {
   period: { from: string; to: string }
   currencySign: string
+  paymentMethods: PaymentMethodCfg[]
   kpis: { totalSales: number; totalOrders: number; totalPending: number; pendingCount: number }
   byMethod: Record<string, number>
   paymentMethodLabels: Record<string, string>
@@ -98,12 +102,23 @@ const QUICK_RANGES = [
   { label: 'Mes', key: 'month' },
 ]
 
+interface CollectState {
+  orderId: string
+  customerName: string
+  total: number
+  method: string
+  amount: string
+  notes: string
+  saving: boolean
+}
+
 export default function InformesPage() {
   const [useShift, setUseShift] = useState(true)
   const [from, setFrom] = useState(todayISO())
   const [to, setTo] = useState(todayISO())
   const [data, setData] = useState<ReportData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [collect, setCollect] = useState<CollectState | null>(null)
 
   const fmt = (n: number) => formatCurrency(n, data?.currencySign ?? '$')
 
@@ -128,6 +143,45 @@ export default function InformesPage() {
     setUseShift(false)
     if (key === 'week') { setFrom(getMondayISO()); setTo(getSundayISO()); return }
     if (key === 'month') { setFrom(getMonthFirstISO()); setTo(getMonthLastISO()); return }
+  }
+
+  function openCollect(p: PendingPayment) {
+    const methods = (data?.paymentMethods ?? []).filter((m) => !m.isCredit)
+    setCollect({
+      orderId: p.id,
+      customerName: p.customerName,
+      total: p.total,
+      method: methods[0]?.key ?? 'cash',
+      amount: String(p.total),
+      notes: '',
+      saving: false,
+    })
+  }
+
+  async function saveCollect() {
+    if (!collect) return
+    setCollect((c) => c && ({ ...c, saving: true }))
+    try {
+      const res = await fetch(`/api/tenant/orders/${collect.orderId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'collect_credit',
+          payments: [{ method: collect.method, amount: parseFloat(collect.amount) || collect.total }],
+          paymentNotes: collect.notes || undefined,
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        alert(err.error ?? 'Error al cobrar')
+        setCollect((c) => c && ({ ...c, saving: false }))
+        return
+      }
+      setCollect(null)
+      load()
+    } catch {
+      setCollect((c) => c && ({ ...c, saving: false }))
+    }
   }
 
   const methodPie = data
@@ -377,8 +431,8 @@ export default function InformesPage() {
           : (
             <div className="space-y-0 divide-y text-sm">
               {data!.pendingPayments.map((p) => (
-                <div key={p.id} className="flex items-start justify-between py-2.5 gap-3">
-                  <div className="min-w-0">
+                <div key={p.id} className="flex items-center justify-between py-2.5 gap-3">
+                  <div className="min-w-0 flex-1">
                     <p className="font-semibold text-amber-800 truncate">{p.customerName}</p>
                     {p.paymentNotes && (
                       <p className="text-xs text-muted-foreground truncate">{p.paymentNotes}</p>
@@ -387,7 +441,12 @@ export default function InformesPage() {
                       {p.closedAt ? new Date(p.closedAt).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
                     </p>
                   </div>
-                  <span className="shrink-0 font-bold text-amber-700">{fmt(p.total)}</span>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="font-bold text-amber-700">{fmt(p.total)}</span>
+                    <Button size="sm" variant="outline" className="text-xs h-7 border-green-600 text-green-700 hover:bg-green-50" onClick={() => openCollect(p)}>
+                      Cobrar
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -430,6 +489,50 @@ export default function InformesPage() {
             </div>
           )}
       </Card>
+      {/* Modal: cobrar pendiente */}
+      {collect && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => !collect.saving && setCollect(null)}>
+          <div className="bg-background rounded-xl shadow-xl w-full max-w-sm p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <h2 className="font-bold text-base">Cobrar deuda — {collect.customerName}</h2>
+            <p className="text-sm text-muted-foreground">Total pendiente: <span className="font-semibold text-foreground">{fmt(collect.total)}</span></p>
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-muted-foreground">Forma de pago</label>
+              <div className="flex flex-wrap gap-2">
+                {(data?.paymentMethods ?? []).filter((m) => !m.isCredit).map((m) => (
+                  <button
+                    key={m.key}
+                    onClick={() => setCollect((c) => c && ({ ...c, method: m.key }))}
+                    className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${collect.method === m.key ? 'bg-primary text-primary-foreground border-primary' : 'hover:bg-muted'}`}
+                  >{m.label}</button>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-muted-foreground">Monto recibido</label>
+              <Input
+                type="number"
+                value={collect.amount}
+                onChange={(e) => setCollect((c) => c && ({ ...c, amount: e.target.value }))}
+                placeholder={String(collect.total)}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-muted-foreground">Observaciones (opcional)</label>
+              <Input
+                value={collect.notes}
+                onChange={(e) => setCollect((c) => c && ({ ...c, notes: e.target.value }))}
+                placeholder="Ej: pagó en dos cuotas..."
+              />
+            </div>
+            <div className="flex gap-2 pt-2">
+              <Button variant="outline" className="flex-1" onClick={() => setCollect(null)} disabled={collect.saving}>Cancelar</Button>
+              <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={saveCollect} disabled={collect.saving}>
+                {collect.saving ? 'Guardando...' : 'Confirmar cobro'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

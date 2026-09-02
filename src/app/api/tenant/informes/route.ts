@@ -285,6 +285,7 @@ export async function GET(req: NextRequest) {
       kpis: { totalSales, totalOrders, totalPending, pendingCount: pendingPayments.length },
       byMethod,
       paymentMethodLabels: methodLabels,
+      paymentMethods: (tenant.posConfig as PosConfig | null)?.paymentMethods ?? [],
       byType,
       dailySeries,
       topProducts,

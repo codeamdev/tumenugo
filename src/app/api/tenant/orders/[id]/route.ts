@@ -259,6 +259,60 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       return NextResponse.json({ data: result })
     }
 
+    // Collect payment on a credit/fiado order
+    if (body.action === 'collect_credit') {
+      const payData = updatePaymentSchema.parse(body)
+      const result = await withTenant(tenant.schemaName, async (db) => {
+        const [order] = await db.select().from(orders).where(eq(orders.id, params.id)).limit(1)
+        if (!order) return null
+        if (order.status !== 'closed' || order.paymentStatus !== 'pending') return 'not_pending' as const
+
+        const total = parseFloat(order.total ?? '0')
+        const validPayments = payData.payments.filter((p) => p.amount > 0)
+        if (validPayments.length === 0) return 'no_payments' as const
+
+        // Use the open register, or the most recent one
+        const [openReg] = await db
+          .select({ id: cashRegisters.id })
+          .from(cashRegisters)
+          .where(eq(cashRegisters.status, 'open'))
+          .orderBy(desc(cashRegisters.openedAt))
+          .limit(1)
+        const registerId = openReg?.id
+        if (!registerId) return 'no_register' as const
+
+        let remaining = total
+        for (const payment of validPayments) {
+          const effectiveAmount = Math.min(payment.amount, remaining)
+          remaining -= effectiveAmount
+          if (effectiveAmount <= 0) continue
+          await db.insert(cashRegisterEntries).values({
+            registerId,
+            orderId: params.id,
+            type: 'sale',
+            amount: String(effectiveAmount),
+            paymentMethod: toDbMethod(payment.method),
+            notes: payData.paymentNotes ?? null,
+          })
+        }
+
+        const primaryMethod = toDbMethod(validPayments[0].method)
+        const [updated] = await db
+          .update(orders)
+          .set({ paymentStatus: 'paid', paymentMethod: primaryMethod, paymentNotes: payData.paymentNotes ?? null, updatedAt: new Date() })
+          .where(eq(orders.id, params.id))
+          .returning()
+
+        return updated
+      })
+
+      if (!result) return NextResponse.json({ error: 'No encontrado' }, { status: 404 })
+      if (result === 'not_pending') return NextResponse.json({ error: 'El pedido no está pendiente de pago' }, { status: 422 })
+      if (result === 'no_payments') return NextResponse.json({ error: 'Debes ingresar al menos un pago' }, { status: 422 })
+      if (result === 'no_register') return NextResponse.json({ error: 'No hay caja abierta para registrar el cobro' }, { status: 422 })
+      return NextResponse.json({ data: result })
+    }
+
     // Add items to existing order
     if (body.action === 'add_items') {
       const addData = addItemsSchema.parse(body)
