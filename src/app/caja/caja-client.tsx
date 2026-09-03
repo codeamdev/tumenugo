@@ -83,8 +83,24 @@ export function CajaClient({ register, summary, history, currencySign, paymentMe
     }
   }
 
+  // Compute total difference across all methods
+  const totalDiff = summary
+    ? round2(
+        Object.entries(summary.byPaymentMethod).reduce((acc, [method, expected]) => {
+          const counted = parseFloat(countedByMethod[method] ?? '0') || 0
+          return acc + (counted - expected)
+        }, 0)
+      )
+    : 0
+  const hasDifference = Math.abs(totalDiff) > 0.01
+  const notesRequired = hasDifference && !closeNotes.trim()
+
   async function handleClose() {
     if (!summary || !countedByMethod['cash']) return
+    if (notesRequired) {
+      toast({ title: 'Observación requerida', description: 'Hay una diferencia en el arqueo. Describe el motivo en las observaciones.', variant: 'destructive' })
+      return
+    }
     setLoading(true)
     try {
       const methodsToShow = [
@@ -302,19 +318,31 @@ export function CajaClient({ register, summary, history, currencySign, paymentMe
                 })}
             </div>
 
+            {hasDifference && (
+              <Alert className="border-amber-300 bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 text-sm">
+                <AlertTriangle className="h-4 w-4" />
+                <span className="ml-2 font-medium">
+                  Diferencia de {totalDiff > 0 ? `+${fmt(totalDiff)}` : fmt(totalDiff)} — se requiere observación para cerrar.
+                </span>
+              </Alert>
+            )}
+
             <div className="space-y-2">
-              <Label>Observaciones del cierre (opcional)</Label>
+              <Label className={notesRequired ? 'text-destructive' : ''}>
+                Observaciones {hasDifference ? '(obligatorio)' : '(opcional)'}
+              </Label>
               <Input
                 value={closeNotes}
                 onChange={(e) => setCloseNotes(e.target.value)}
-                placeholder="Todo en orden, etc."
+                placeholder={hasDifference ? 'Describe el motivo de la diferencia...' : 'Todo en orden, etc.'}
+                className={notesRequired ? 'border-destructive' : ''}
               />
             </div>
 
             <Button
               variant="destructive"
               onClick={handleClose}
-              disabled={!countedByMethod['cash'] || loading}
+              disabled={!countedByMethod['cash'] || loading || notesRequired}
               loading={loading}
             >
               <Lock className="h-4 w-4 mr-2" />

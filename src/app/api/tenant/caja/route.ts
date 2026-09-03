@@ -58,8 +58,27 @@ export async function GET(req: NextRequest) {
       closedAt: r.closedAt?.toISOString() ?? null,
     } : null
 
+    // For history: compute salesByMethod (actual entries) per closed register
+    let salesByRegister: Record<string, Record<string, number>> = {}
+    if (history.length > 0) {
+      const historyIds = history.map((h) => h.id)
+      const histEntries = await db
+        .select({ registerId: cashRegisterEntries.registerId, paymentMethod: cashRegisterEntries.paymentMethod, amount: cashRegisterEntries.amount })
+        .from(cashRegisterEntries)
+        .where(and(inArray(cashRegisterEntries.registerId, historyIds), eq(cashRegisterEntries.type, 'sale')))
+      for (const e of histEntries) {
+        const rid = e.registerId!
+        const key = e.paymentMethod ?? 'other'
+        if (!salesByRegister[rid]) salesByRegister[rid] = {}
+        salesByRegister[rid][key] = (salesByRegister[rid][key] ?? 0) + parseFloat(e.amount ?? '0')
+      }
+    }
+
     if (!register) {
-      return { register: null, summary: null, history: history.map(serialise) }
+      return {
+        register: null, summary: null,
+        history: history.map((h) => ({ ...serialise(h), salesByMethod: salesByRegister[h.id] ?? {} })),
+      }
     }
 
     const closedOrders = await db
@@ -120,7 +139,7 @@ export async function GET(req: NextRequest) {
         expectedCash,
         openingAmount: parseFloat(register.openingAmount ?? '0'),
       },
-      history: history.map(serialise),
+      history: history.map((h) => ({ ...serialise(h), salesByMethod: salesByRegister[h.id] ?? {} })),
     }
   })
 

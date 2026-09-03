@@ -802,10 +802,10 @@ export function PedidosScreen({
                         <span className="text-muted-foreground">{getOriginIcon(o.type)}</span>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="font-medium text-sm">{label}</span>
                             {o.displayCode && (
-                              <span className="text-xs font-mono text-muted-foreground">{o.displayCode}</span>
+                              <span className="font-semibold text-sm font-mono">{o.displayCode}</span>
                             )}
+                            <span className="text-sm text-muted-foreground">{label}</span>
                           </div>
                           <span className="text-xs text-muted-foreground">
                             {o.closedAt ? new Date(o.closedAt).toLocaleString('es-CO') : elapsedLabel(o.createdAt)}
